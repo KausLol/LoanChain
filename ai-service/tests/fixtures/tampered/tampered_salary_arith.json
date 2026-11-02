@@ -1,0 +1,8 @@
+{
+  "fixture": "tampered_salary_arith.pdf",
+  "description": "Salary slip where net salary does not equal gross minus deductions",
+  "expected_verdict": 2,
+  "expected_reasons": [
+    "ARITH_NET_MISMATCH"
+  ]
+}

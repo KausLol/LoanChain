@@ -1,0 +1,13 @@
+id: other.default
+version: 1.0.0
+docType: Other
+extends: null
+anchors: []
+fields: {}
+tables: {}
+rules: []
+forensics:
+  expected_producers_hint: null
+  flag_editor_producers: true
+  require_single_revision: true
+  check_font_uniformity: false

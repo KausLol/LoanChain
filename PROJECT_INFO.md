@@ -69,6 +69,11 @@ LoanChain establishes a **decentralized, tamper-evident trust anchor** on the Et
 | **Ethers.js** | `^6.17.0` | Web3 Library | Wallet connection, RPC provider orchestration, contract abstraction, ABI encoding, and client-side `keccak256` hashing. |
 | **MetaMask** | Browser Extension | Wallet / Signer | Non-custodial key management, Sepolia network switching, account authorization, and gas transaction signing. |
 | **Web Crypto API** | Browser Native | Security / Utility | In-browser file reading (`arrayBuffer`), byte extraction, and random 32-byte salt generation. |
+| **Python** | `3.11+` | AI Service Runtime | Isolated virtual environment powering the explainable AI verification microservice. |
+| **FastAPI / Uvicorn** | `^0.115.0` | AI Web Framework | High-performance asynchronous API endpoints for document and bundle verification. |
+| **PyMuPDF / pdfplumber** | `^1.25.0` | Text & Layout Extraction | Native vector text, bounding box, font name, and structured tabular extraction. |
+| **pgmpy** | `^0.1.26` | Uncertainty Reasoning | Discrete Bayesian Network scoring for multi-factor document risk probability estimation. |
+| **Eth-Account / Eth-Hash**| `^0.13.0` | Cryptography & Signing | EIP-712 typed-data hashing and secp256k1 low-$s$ ECDSA signature generation. |
 | **Lucide React** | `^1.62.0` | UI Design | Consistent, modern vector iconography replacing all emojis. |
 | **CSS3 Design System** | Custom Properties | Styling | Clean, human-made fintech dashboard UI (slate neutrals, royal blue accents, zero AI gradients). |
 
@@ -289,6 +294,12 @@ Because contracts inherit addresses from one another, they **must be deployed in
 4. **Deploy `LoanApplication.sol`**
    - Constructor arguments: `DOCUMENT_REGISTRY_ADDRESS`, `ISSUER_REGISTRY_ADDRESS`
    - Copy deployed address $\to$ `LOAN_APPLICATION_ADDRESS`
+5. **Deploy `AIAttestation.sol`** (Phase 2 AI Verification Layer)
+   - Constructor arguments: `DOCUMENT_REGISTRY_ADDRESS`, `AI_SIGNER_ADDRESS`
+   - Copy deployed address $\to$ `AI_ATTESTATION_ADDRESS`
+6. **Post-Deployment Linking**:
+   - Link attestation contract: `LoanApplication.setAIAttestation(AI_ATTESTATION_ADDRESS)`
+   - *(Optional)* Enable strict AI enforcement: `LoanApplication.setRequireAIForDocsVerified(true)`
 
 ### 8.2 Frontend Configuration
 Create or update `frontend/.env`:
@@ -297,10 +308,17 @@ VITE_ISSUER_REGISTRY=0xYourIssuerRegistryAddress
 VITE_DOC_REGISTRY=0xYourDocumentRegistryAddress
 VITE_CONSENT_MANAGER=0xYourConsentManagerAddress
 VITE_LOAN_APPLICATION=0xYourLoanApplicationAddress
+VITE_AI_ATTESTATION=0xYourAIAttestationAddress
+VITE_AI_SERVICE_URL=http://localhost:8000
 ```
 
 ### 8.3 Starting the Development Server
 ```bash
+# Terminal 1: Start AI Verification Service
+cd ai-service
+.\.venv\Scripts\uvicorn app.main:app --port 8000 --reload
+
+# Terminal 2: Start Frontend Application
 cd frontend
 npm install
 npm run dev
@@ -310,37 +328,42 @@ Open `http://localhost:5173` in your browser. Ensure MetaMask is connected to **
 ### 8.4 Testing the End-to-End Workflow
 1. **Connect Wallet**: Click "Connect Wallet" on the top-right header or dashboard widget.
 2. **Register a Document**: Navigate to **My Documents** or use the dashboard dropzone. Select a PDF from the `dummy/` directory. The file is hashed in memory. Click "Register Document on Blockchain" and approve the transaction in MetaMask.
-3. **Submit Loan**: Go to **New Application**. Set desired amount (e.g. `0.25 ETH`), tenure (e.g. `12` months), and purpose. In Step 2, select your newly registered document. Review and click "Submit Loan Application".
-4. **Inspect Audit Log**: Go to **Audit Log** to inspect the `Submitted` state entry recorded with your address and timestamp.
-5. **Officer Review**: If logged in with the contract owner or added officer wallet, open **Applications**, click "Details", and execute "Mark Docs Verified", "Move to Under Review", or "Approve Loan".
+3. **Run AI Verification**: Click "AI Verify" on your registered document card. Review the privacy consent modal, inspect extracted masked fields and deterministic rule checks, then click "Anchor AI Result on Sepolia" to record the EIP-712 attestation.
+4. **Submit Loan**: Go to **New Application**. Set desired amount, tenure, and purpose. In Step 2, select your AI-verified document. Review and click "Submit Loan Application".
+5. **Inspect Audit Log**: Go to **Audit Log** to inspect state entries and open the **AI Attestations** tab to view the immutable cryptographic records.
+6. **Officer Review**: If logged in with the contract owner or added officer wallet, open **Applications**, click "Details", view the AI bundle reconciliation report and advisory suggested action, and execute status transitions.
 
 ---
 
-## 9. AI Verification Layer: Phase 2 Roadmap
+## 9. AI Verification Layer: Phase 2 Architecture (Completed)
 
-The blockchain architecture has been explicitly engineered with clean interfaces to integrate the Phase 2 AI verification layer:
+The Phase 2 AI verification layer is fully implemented and operational across the off-chain Python microservice, the Sepolia smart contracts, and the React frontend:
 
 ```
-[Applicant Document PDF]
+[Applicant Document PDF / Image]
           │
           ▼
-[AI Service (Off-Chain: Python / FastAPI)]
-  ├── OCR & Perception: Tesseract / EasyOCR (Text extraction from salary slips & statements)
-  ├── NLP Extraction: spaCy / NLTK (Field normalization: Gross, Net, Account No, Employer)
-  ├── Rule Engine (FOPL): Forward chaining consistency checks
-  │     e.g., NameMatch(PAN, Slip) ∧ SalaryCreditMatches(Slip, Statement) → IncomeVerified
-  ├── Uncertainty Reasoning: pgmpy Bayesian Network (Fraud & default probability scoring)
-  ├── Search & CSP: A* search for closest approvable counter-offer terms
-  │
-  ▼
-[AI Signature & Attestation Record]
-  (Decision: Approved/Borderline/Rejected, Confidence Score, Model Version, Hash of Explanation)
+[AI Service (Off-Chain: Python 3.11 / FastAPI)]
+  ├── Secure Intake: Magic-byte sniffing, size & page limits, decompression bomb prevention
+  ├── On-Chain Binding: keccak256 rehash verification vs DocumentRegistry.verifyIntegrity
+  ├── Layout & Text Extraction: PyMuPDF native layer + Tesseract OCR fallback
+  ├── Declarative Templates: Versioned YAML specs (earnings, deductions, balances, anchors)
+  ├── Rule Engine (FOPL): Forward chaining consistency & exact arithmetic reconciliation (±₹1.00)
+  ├── Digital Forensics: Metadata editor traces, incremental updates, overlay whiteouts, ELA
+  ├── Risk Scoring: Discrete Bayesian Network (pgmpy) with monotonic CPTs & BPS confidence
+  ├── Explanation & Hashing: RFC 8785 canonical JSON sorting & keccak256 explanationHash
+  └── EIP-712 Signer: Low-s ECDSA signature with 256-bit random replay nonces
           │
           ▼
 [AIAttestation.sol Smart Contract (Sepolia)]
-          │ (EIP-712 cryptographic signature verification)
+  ├── Replay protection (!usedNonces[nonce]) & deadline verification
+  ├── On-chain hash integrity assertion with DocumentRegistry
+  ├── Low-s malleability check & ecrecover(digest, v, r, s) == aiSigner
+  └── Aggregate bundle evaluation: bundleVerdict(bytes32[] docIds)
+          │
           ▼
-[LoanApplication.sol] ──> Moves to DocsVerified / Approved / CounterOffered
+[LoanApplication.sol]
+  └── Gated markDocsVerified() with requireAIForDocsVerified policy switch
 ```
 
-All on-chain hooks, state transitions, and explanation string fields are already in place in `LoanApplication.sol` to support this automated pipeline in Phase 2.
+For full specifications, rules, and AI document generation prompts, see [`AI_VERIFICATION_GUIDE.md`](AI_VERIFICATION_GUIDE.md).

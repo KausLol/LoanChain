@@ -1,0 +1,10 @@
+{
+  "fixture": "mismatched_bundle",
+  "doc1": "salary1234.pdf (Aarav Mehta, BluePeak)",
+  "doc2": "statement456.pdf (Priya Sharma, NovaByte)",
+  "expected_bundle_verdict": 2,
+  "expected_bundle_reasons": [
+    "NAME_MISMATCH",
+    "SALARY_CREDIT_MISMATCH"
+  ]
+}

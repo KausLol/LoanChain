@@ -1,0 +1,92 @@
+id: salary_slip.default
+version: 1.0.0
+docType: SalarySlip
+extends: null
+anchors:
+  - ["salary slip", "payslip", "pay slip", "salary statement"]
+  - ["earnings", "deductions", "net pay", "net salary", "gross earnings", "basic salary"]
+fields:
+  employee_name:
+    aliases: ["Employee Name", "Name of Employee", "Full Name", "Employee"]
+    type: name
+    required: true
+  employer_name:
+    aliases: ["Company Name", "Company", "Employer", "Organisation", "Organization"]
+    type: text
+    required: true
+  employee_id:
+    aliases: ["Employee ID", "Emp ID", "Staff No", "Emp Code"]
+    type: id
+    required: false
+  designation:
+    aliases: ["Designation", "Role", "Position"]
+    type: text
+    required: false
+  department:
+    aliases: ["Department", "Dept"]
+    type: text
+    required: false
+  pay_period:
+    aliases: ["Pay Period", "Month", "Salary Month", "Period"]
+    type: month
+    required: true
+  payment_date:
+    aliases: ["Payment Date", "Pay Date", "Date of Payment", "Date"]
+    type: date
+    required: false
+  pan:
+    aliases: ["PAN", "PAN No", "Permanent Account Number"]
+    type: pan
+    required: false
+  bank_account:
+    aliases: ["Account No", "A/C No", "Bank A/C", "Bank Account Number"]
+    type: account
+    required: false
+  gross_earnings:
+    aliases: ["Gross Earnings", "Gross Salary", "Total Earnings", "Total Gross"]
+    type: money
+    required: true
+  total_deductions:
+    aliases: ["Total Deductions", "Gross Deductions", "Total Deduction"]
+    type: money
+    required: true
+  net_pay:
+    aliases: ["Net Salary Payable", "Net Pay", "Net Salary", "Take Home", "Net Amount"]
+    type: money
+    required: true
+  net_pay_words:
+    aliases: ["Net Pay (in words)", "Amount in words", "In Words"]
+    type: words
+    required: false
+tables:
+  earnings:
+    header_aliases: ["Earnings"]
+    amount_column: "Amount"
+  deductions:
+    header_aliases: ["Deductions"]
+    amount_column: "Amount"
+rules:
+  - id: ARITH_GROSS_SUM
+    blocking: true
+    description: "Sum of earnings components must equal gross earnings"
+    expr: "sum(tables.earnings) == fields.gross_earnings"
+    tolerance:
+      abs: 1.00
+    reason_code: "ARITH_GROSS_MISMATCH"
+  - id: ARITH_NET
+    blocking: true
+    description: "Gross earnings minus total deductions must equal net salary"
+    expr: "fields.gross_earnings - fields.total_deductions == fields.net_pay"
+    tolerance:
+      abs: 1.00
+    reason_code: "ARITH_NET_MISMATCH"
+  - id: RECENT_PAY_PERIOD
+    blocking: false
+    description: "Pay period must be within maximum age window"
+    expr: "months_between(fields.pay_period, today) <= thresholds.recency.salary_slip_max_age_months"
+    reason_code: "PAY_PERIOD_STALE"
+forensics:
+  expected_producers_hint: ["system-generated", "payroll", "microsoft: print to pdf", "word"]
+  flag_editor_producers: true
+  require_single_revision: true
+  check_font_uniformity: true

@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useWeb3 } from "../context/Web3Context";
 import { useDocuments } from "../hooks/useBlockchain";
 import { DOC_TYPE_LABELS, DOC_STATUS_LABELS } from "../config/contracts";
+import AIBadge from "../components/AIBadge";
+import AIVerificationPanel from "../components/AIVerificationPanel";
 import {
   Folder,
   FileText,
@@ -14,21 +16,32 @@ import {
   Copy,
   Check,
   ShieldCheck,
+  Shield,
 } from "lucide-react";
 
-function StatusBadge({ status }) {
-  const badgeClasses = {
-    0: "badge-submitted",
-    1: "badge-verified",
-    2: "badge-approved",
-    3: "badge-rejected",
-    4: "badge-needsdocs",
-  };
-  return (
-    <span className={`status-badge ${badgeClasses[status] || "badge-submitted"}`}>
-      {DOC_STATUS_LABELS[status] || "Pending"}
-    </span>
-  );
+function StatusBadge({ status, aiAttestation }) {
+  if (status === 4) {
+    return <span className="status-badge badge-needsdocs">Revoked</span>;
+  }
+  if (status === 3) {
+    return <span className="status-badge badge-rejected">Rejected</span>;
+  }
+  if (status === 1) {
+    return <span className="status-badge badge-verified">Issuer Attested</span>;
+  }
+  if (status === 2) {
+    return <span className="status-badge badge-approved">Officer Verified</span>;
+  }
+  if (aiAttestation) {
+    if (aiAttestation.verdict === 0) {
+      return <span className="status-badge badge-approved">Anchored on Chain</span>;
+    } else if (aiAttestation.verdict === 1) {
+      return <span className="status-badge badge-review">Under Review</span>;
+    } else if (aiAttestation.verdict === 2) {
+      return <span className="status-badge badge-rejected">AI Rejected</span>;
+    }
+  }
+  return <span className="status-badge badge-submitted">Registered</span>;
 }
 
 function formatDate(ts) {
@@ -62,6 +75,7 @@ export default function DocumentsPage() {
   const [uploadErr, setUploadErr] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
   const [selectedDoc, setSelectedDoc] = useState(null);
+  const [aiVerifyingDoc, setAiVerifyingDoc] = useState(null);
   const fileInputRef = useRef(null);
 
   const refresh = useCallback(async () => {
@@ -72,7 +86,33 @@ export default function DocumentsPage() {
     setRefreshing(true);
     try {
       const d = await getMyDocuments(account);
-      setDocs(d || []);
+      if (contracts.aiAttestation && d && d.length > 0) {
+        const enriched = await Promise.all(
+          d.map(async (item) => {
+            try {
+              const has = await contracts.aiAttestation.hasAttestation(item.id);
+              if (has) {
+                const att = await contracts.aiAttestation.getLatestAttestation(item.id);
+                return {
+                  ...item,
+                  aiAttestation: {
+                    verdict: Number(att[2]),
+                    confidenceBps: Number(att[3]),
+                    templateRef: att[4],
+                    explanationHash: att[6],
+                  },
+                };
+              }
+            } catch (err) {
+              console.warn("AI attestation check failed for", item.id, err);
+            }
+            return item;
+          })
+        );
+        setDocs(enriched);
+      } else {
+        setDocs(d || []);
+      }
     } catch (e) {
       console.error(e);
       setDocs([]);
@@ -369,7 +409,21 @@ export default function DocumentsPage() {
                     </div>
 
                     <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                      <StatusBadge status={doc.status} />
+                      <AIBadge
+                        verdict={doc.aiAttestation?.verdict}
+                        confidenceBps={doc.aiAttestation?.confidenceBps}
+                        size="sm"
+                      />
+                      <StatusBadge status={doc.status} aiAttestation={doc.aiAttestation} />
+                      <button
+                        className="btn btn-outline btn-sm"
+                        onClick={() => setAiVerifyingDoc(doc)}
+                        title="Run AI Verification on this document"
+                        style={{ display: "inline-flex", alignItems: "center", gap: "5px" }}
+                      >
+                        <Shield size={12} color="#2563eb" />
+                        <span>AI Verify</span>
+                      </button>
                       <button
                         className="btn btn-outline btn-sm"
                         onClick={() => setSelectedDoc(doc)}
@@ -403,7 +457,7 @@ export default function DocumentsPage() {
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--border-color)" }}>
                   <span style={{ color: "#6b7280" }}>Status</span>
-                  <StatusBadge status={selectedDoc.status} />
+                  <StatusBadge status={selectedDoc.status} aiAttestation={selectedDoc.aiAttestation} />
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: "4px", padding: "8px 0", borderBottom: "1px solid var(--border-color)" }}>
                   <span style={{ color: "#6b7280", fontSize: "12px" }}>keccak256 Hash</span>
@@ -421,10 +475,41 @@ export default function DocumentsPage() {
                   <span style={{ color: "#6b7280" }}>Attested By</span>
                   <span style={{ fontSize: "12px" }}>{selectedDoc.issuer || "Self-Uploaded"}</span>
                 </div>
+                {selectedDoc.aiAttestation && (
+                  <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0" }}>
+                    <span style={{ color: "#6b7280" }}>AI Attestation</span>
+                    <AIBadge
+                      verdict={selectedDoc.aiAttestation.verdict}
+                      confidenceBps={selectedDoc.aiAttestation.confidenceBps}
+                    />
+                  </div>
+                )}
               </div>
             </div>
             <div className="modal-card-footer">
               <button className="btn btn-outline" onClick={() => setSelectedDoc(null)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Verification Modal */}
+      {aiVerifyingDoc && (
+        <div className="modal-backdrop" onClick={() => setAiVerifyingDoc(null)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "680px", maxHeight: "90vh", overflowY: "auto" }}>
+            <div className="modal-card-header">
+              <span className="modal-card-title">AI Document Verification</span>
+              <button className="btn btn-outline btn-sm" onClick={() => setAiVerifyingDoc(null)}>✕</button>
+            </div>
+            <div className="modal-card-body" style={{ padding: "0 20px 20px 20px" }}>
+              <AIVerificationPanel
+                doc={aiVerifyingDoc}
+                contracts={contracts}
+                onAnchored={async () => {
+                  await refresh();
+                }}
+                onClose={() => setAiVerifyingDoc(null)}
+              />
             </div>
           </div>
         </div>

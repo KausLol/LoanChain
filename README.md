@@ -1,22 +1,26 @@
 # LoanChain 
 
-**Blockchain-Powered Loan Document Verification**
-Built on Ethereum Sepolia · MetaMask · Solidity · React + ethers.js
+**Blockchain-Powered Loan Document Verification with Explainable AI**  
+Built on Ethereum Sepolia · MetaMask · Solidity · React + Ethers.js v6 · FastAPI + PyMuPDF + pgmpy
 
 ---
 
-## Clean, Human-Made UI Design
+## System Overview
 
-The user interface has been completely redesigned following real-world fintech & SaaS design systems:
-- **Zero AI Gradients**: Pure solid colors (Slate, Royal Blue, Emerald, Amber, Rose).
-- **Zero Emojis**: Every emoji replaced with crisp SVG and Lucide icons.
-- **Reference-Accurate Dashboard**:
-  - **Top Header**: Clean geometric cube outline logo + "LoanChain", network pill with active green dot (`Sepolia Testnet`), and MetaMask wallet pill (`0x3f2...a7C1`).
-  - **Left Sidebar**: Clear navigation (`Dashboard`, `New Application`, `My Documents`, `Applications`, `Audit Log`, `Officer Panel`, `Document Verifier`).
-  - **4 Clean Metric Cards**: Verified Documents, Active Application, Approved Applications, Pending Actions.
-  - **Upload Document Card**: Dashed dropzone with local browser-side keccak256 hashing and IPFS CID storage.
-  - **Recent Activity Card**: Vertical timeline with connected line, color-coded event dots, and direct "View on Blockchain" links.
-  - **Your Applications**: Clean data table with soft status badges (`Under Review`, `Approved`, `Rejected`, `Counter Offered`) and details modal.
+LoanChain pairs a decentralized, tamper-evident blockchain layer with an off-chain explainable AI document verification engine:
+1. **Phase 1: Blockchain Infrastructure (Sepolia)**:
+   - Client-side in-browser `keccak256` hashing and Merkle bundle generation.
+   - Strict state machine (`LoanApplication.sol`) and immutable on-chain audit trails.
+   - Institutional trust anchors via accredited issuer attestations (`IssuerRegistry.sol`).
+2. **Phase 2: Classical Explainable AI Verification Layer (`ai-service/`)**:
+   - Layout-aware PDF and image text extraction with OCR fallback.
+   - Versioned, declarative validation templates (`id@version`) specifying expected fields and arithmetic relations.
+   - Deterministic forward-chaining rule engine (FOPL) generating verifiable proof traces.
+   - Forensic signal detection (editing software metadata, font inconsistencies, incremental updates, overlay whiteouts, ELA).
+   - Bayesian risk network (`pgmpy`) computing fraud probability and advisory verdicts (`Approved`, `Borderline`, `Rejected`).
+   - Cryptographic EIP-712 typed-data signing anchored on-chain via `AIAttestation.sol`.
+
+For full specifications and document generation prompts, see [`AI_VERIFICATION_GUIDE.md`](AI_VERIFICATION_GUIDE.md).
 
 ---
 
@@ -24,76 +28,89 @@ The user interface has been completely redesigned following real-world fintech &
 
 ```
 loanchain_new/
+├── ai-service/             ← Phase 2: Classical Explainable AI Verification Service
+│   ├── app/
+│   │   ├── api/            ← FastAPI endpoints (/verify/document, /verify/bundle, /report, /templates)
+│   │   ├── core/           ← Intake, chain client, extract, rules, forensics, scoring, signing
+│   │   ├── models/         ← Pydantic schemas (facts, template, result)
+│   │   └── store/          ← SQLite report persistence (keyed by explanationHash)
+│   ├── templates/          ← Versioned declarative YAML validation templates
+│   ├── tests/              ← 39 automated pytest integration and unit tests
+│   ├── .env.example
+│   └── requirements.txt
+│
 ├── contracts/              ← Solidity contracts (deploy via Remix IDE)
 │   ├── IssuerRegistry.sol
 │   ├── DocumentRegistry.sol
 │   ├── ConsentManager.sol
-│   ├── LoanApplication.sol
+│   ├── LoanApplication.sol ← State machine with requireAIForDocsVerified gating
+│   ├── AIAttestation.sol   ← Phase 2: EIP-712 attestation verifier & bundle evaluator
 │   └── README.md           ← Remix IDE deployment guide
 │
-└── frontend/               ← React + ethers.js frontend
-    ├── src/
-    │   ├── components/
-    │   │   ├── Header.jsx      ← Clean top bar with network & MetaMask pills
-    │   │   ├── Sidebar.jsx     ← Clean vertical navigation sidebar
-    │   │   └── Icons.jsx       ← Geometric cube logo & MetaMask Fox SVG
-    │   ├── config/
-    │   │   └── contracts.js    ← ABIs, contract addresses, enum labels
-    │   ├── context/
-    │   │   └── Web3Context.jsx ← MetaMask / ethers.js provider
-    │   ├── hooks/
-    │   │   └── useBlockchain.js ← Document & loan lifecycle hooks
-    │   ├── pages/
-    │   │   ├── DashboardPage.jsx   ← Primary dashboard matching reference screenshot
-    │   │   ├── LoanApplicationPage.jsx ← 3-step loan application form with EMI calculator
-    │   │   ├── DocumentsPage.jsx   ← My Documents registry & client-side hashing
-    │   │   ├── ApplicationsPage.jsx ← Filterable loan applications table
-    │   │   ├── AuditTrailPage.jsx  ← State machine & document event logs
-    │   │   ├── OfficerPanelPage.jsx ← Bank officer review, counter-offers, decisions
-    │   │   └── VerifyPage.jsx      ← Document integrity tamper-check tool
-    │   ├── index.css           ← Clean design system (no gradients, solid colors)
-    │   └── App.jsx
-    ├── .env.example
-    └── index.html
+├── frontend/               ← React 19 + Vite + Ethers.js v6 frontend
+│   ├── src/
+│   │   ├── components/     ← AIBadge, AIVerificationPanel, Header, Sidebar, Icons
+│   │   ├── config/         ← ABIs, contract addresses, enum labels
+│   │   ├── context/        ← Web3Context (MetaMask provider & contracts)
+│   │   ├── hooks/          ← useAIVerification, useBlockchain
+│   │   ├── services/       ← aiService (FastAPI client)
+│   │   ├── pages/          ← Dashboard, Documents, LoanApplication, Applications, AuditTrail
+│   │   └── index.css       ← Clean fintech design system (slate neutrals, royal blue)
+│   ├── .env.example
+│   └── package.json
+│
+├── dummy/                  ← Sample real-world test PDFs (Aarav Mehta & Priya Sharma bundles)
+├── AI_VERIFICATION_GUIDE.md ← Comprehensive AI verification manual & generation guide
+└── PROJECT_INFO.md         ← Full architectural and contract documentation
 ```
 
 ---
 
-## Quick Start
+## Quick Start Guide
 
-### Step 1 — Deploy Contracts (Remix IDE)
+### Step 1 — Deploy Smart Contracts (Remix IDE)
 
-See [`contracts/README.md`](contracts/README.md) for full instructions.
+Follow [`contracts/README.md`](contracts/README.md) to compile with Solidity `0.8.19` (200 optimizer runs):
+1. Deploy `IssuerRegistry.sol`
+2. Deploy `DocumentRegistry.sol` (arg: `IssuerRegistry` address)
+3. Deploy `ConsentManager.sol`
+4. Deploy `LoanApplication.sol` (args: `DocumentRegistry` address, `IssuerRegistry` address)
+5. Deploy `AIAttestation.sol` (args: `DocumentRegistry` address, `AI_SIGNER_ADDRESS`)
+6. Link attestation on `LoanApplication`: call `LoanApplication.setAIAttestation(AIAttestation_address)`
 
-**Order:**
-1. `IssuerRegistry.sol`
-2. `DocumentRegistry.sol` (arg: IssuerRegistry address)
-3. `ConsentManager.sol`
-4. `LoanApplication.sol` (args: DocumentRegistry address, IssuerRegistry address)
+### Step 2 — Start the AI Verification Microservice
 
-**Network:** Ethereum Sepolia Testnet (Chain ID: `11155111`)
+```bash
+cd ai-service
 
-### Step 2 — Configure Frontend (ONLY FOR OFFICER ACCOUNT)
+# Create and activate Python 3.11 virtual environment
+uv venv --python 3.11
+# Windows PowerShell:
+.\.venv\Scripts\Activate.ps1
+
+# Install pinned dependencies
+uv pip install -r requirements.txt
+
+# Run the test suite (39 tests)
+pytest
+
+# Launch FastAPI service on port 8000
+uvicorn app.main:app --port 8000 --reload
+```
+
+### Step 3 — Start the Frontend Application
 
 ```bash
 cd frontend
-cp .env.example .env
-```
 
-Set your contract addresses:
-```
-VITE_ISSUER_REGISTRY=0x...
-VITE_DOC_REGISTRY=0x...
-VITE_CONSENT_MANAGER=0x...
-VITE_LOAN_APPLICATION=0x...
-```
-
-### Step 3 — Run Development Server
-
-```bash
-cd frontend
+# Install dependencies
 npm install
+
+# Configure environment in frontend/.env
+cp .env.example .env
+
+# Start Vite development server
 npm run dev
 ```
 
-Open `http://localhost:5173` in your browser and connect MetaMask.
+Open `http://localhost:5173` in your browser. Ensure MetaMask is connected to **Ethereum Sepolia Testnet**.

@@ -1,0 +1,50 @@
+id: it_return.default
+version: 1.0.0
+docType: ITReturn
+extends: null
+anchors:
+  - ["income tax return", "acknowledgement", "itr-v", "indian income tax return verification form"]
+  - ["assessment year", "pan", "gross total income", "total income", "taxes paid"]
+fields:
+  assessee_name:
+    aliases: ["Name", "Assessee", "Name of Taxpayer"]
+    type: name
+    required: true
+  pan:
+    aliases: ["PAN", "Permanent Account Number"]
+    type: pan
+    required: true
+  assessment_year:
+    aliases: ["Assessment Year", "AY"]
+    type: text
+    required: true
+  gross_total_income:
+    aliases: ["Gross Total Income", "Total Gross Income"]
+    type: money
+    required: true
+  total_deductions:
+    aliases: ["Total Deductions", "Deductions under Chapter VI-A", "Deductions"]
+    type: money
+    required: false
+  total_income:
+    aliases: ["Total Income", "Taxable Income"]
+    type: money
+    required: true
+rules:
+  - id: PAN_SYNTAX_VALID
+    blocking: true
+    description: "PAN format must be valid"
+    expr: "is_valid_pan(fields.pan)"
+    reason_code: "INVALID_PAN_FORMAT"
+  - id: ARITH_TAXABLE_INCOME
+    blocking: true
+    description: "Gross Total Income minus deductions equals Total Income"
+    expr: "fields.gross_total_income - (fields.total_deductions or 0) == fields.total_income"
+    tolerance:
+      abs: 10.00
+    reason_code: "ARITH_ITR_MISMATCH"
+forensics:
+  expected_producers_hint: ["income-tax", "incometax.gov.in", "system-generated"]
+  flag_editor_producers: true
+  require_single_revision: true
+  check_font_uniformity: true

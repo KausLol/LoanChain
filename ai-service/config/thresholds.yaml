@@ -1,0 +1,48 @@
+# LoanChain AI Verification Thresholds & Priors Configuration
+version: 1.0.0
+
+# Verdict thresholds based on fraud probability P(Fraud)
+verdicts:
+  approved_max_fraud_prob: 0.15      # P(Fraud) < 0.15 required for Approved
+  rejected_min_fraud_prob: 0.60      # P(Fraud) >= 0.60 results in Rejected
+  min_extraction_quality: 0.70       # Mean extraction quality must be >= 0.70 for Approved
+
+# Recency constraints
+recency:
+  salary_slip_max_age_months: 3      # Salary slip pay period must be within last 3 months
+  bank_statement_min_months: 1       # Minimum length of statement period (months)
+  bank_statement_max_age_months: 3   # Statement end date within last 3 months
+  address_proof_max_age_months: 6
+
+# Tolerances
+tolerances:
+  arithmetic_money_abs: 1.00         # Absolute tolerance for money rounding (₹1.00)
+  salary_credit_match_pct: 0.02      # 2% tolerance between salary net pay and bank credit
+  annual_income_band_pct: 0.25       # 25% tolerance between ITR and annualized salary slip
+
+# Fuzzy matching thresholds (Rapidfuzz token_set_ratio)
+fuzzy_matching:
+  name_match_min_score: 80.0         # Out of 100
+  employer_match_min_score: 75.0
+  bank_narration_min_score: 70.0
+
+# Bayesian Network CPT Priors (Expert-set, uncalibrated)
+# Target node: Fraudulent {False, True}
+bayesian_network:
+  nodes:
+    - name: TemplateConformance
+      states: [High, Medium, Low]
+    - name: ArithmeticConsistency
+      states: [Consistent, Inconsistent]
+    - name: MetadataAnomaly
+      states: [None, Suspect]
+    - name: EditArtifacts
+      states: [None, Detected]
+    - name: ExtractionQuality
+      states: [Good, Poor]
+    - name: CrossDocConsistency
+      states: [Match, Mismatch]
+    - name: IssuerAttested
+      states: [True, False]
+    - name: Fraudulent
+      states: [False, True]

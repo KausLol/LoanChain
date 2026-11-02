@@ -1,0 +1,81 @@
+id: bank_statement.default
+version: 1.0.0
+docType: BankStatement
+extends: null
+anchors:
+  - ["bank statement", "account statement", "statement of account"]
+  - ["opening balance", "closing balance", "debit", "credit", "balance", "account holder"]
+fields:
+  bank_name:
+    aliases: ["Bank Name", "Bank", "Financial Institution"]
+    type: text
+    required: true
+  branch:
+    aliases: ["Branch", "Branch Name", "Branch Office"]
+    type: text
+    required: false
+  account_holder:
+    aliases: ["Account Holder", "Customer Name", "Account Name", "Name"]
+    type: name
+    required: true
+  account_number:
+    aliases: ["Account Number", "A/C Number", "Account No", "A/C No"]
+    type: account
+    required: true
+  account_type:
+    aliases: ["Account Type", "A/C Type", "Type of Account"]
+    type: text
+    required: false
+  statement_period:
+    aliases: ["Statement Period", "Period", "Statement Duration"]
+    type: text
+    required: true
+  currency:
+    aliases: ["Currency", "Curr"]
+    type: text
+    required: false
+  opening_balance:
+    aliases: ["Opening Balance", "Opening Bal", "Brought Forward", "OB"]
+    type: money
+    required: true
+  total_credits:
+    aliases: ["Total Credits", "Credit Total", "Credits Total", "Total Credit"]
+    type: money
+    required: true
+  total_debits:
+    aliases: ["Total Debits", "Debit Total", "Debits Total", "Total Debit"]
+    type: money
+    required: true
+  closing_balance:
+    aliases: ["Closing Balance", "Closing Bal", "Carried Forward", "CB"]
+    type: money
+    required: true
+tables:
+  transactions:
+    header_aliases: ["Date", "Description", "Debit", "Credit", "Balance"]
+    amount_column: "Balance"
+rules:
+  - id: ARITH_STATEMENT_TOTALS
+    blocking: true
+    description: "Opening balance plus total credits minus total debits must equal closing balance"
+    expr: "fields.opening_balance + fields.total_credits - fields.total_debits == fields.closing_balance"
+    tolerance:
+      abs: 1.00
+    reason_code: "ARITH_STATEMENT_TOTALS_MISMATCH"
+  - id: RUNNING_BALANCE_CONTINUITY
+    blocking: true
+    description: "Transaction row balances must correctly chain through debits and credits"
+    expr: "verify_running_balances(tables.transactions, fields.opening_balance)"
+    tolerance:
+      abs: 1.00
+    reason_code: "RUNNING_BALANCE_DISCONTINUITY"
+  - id: TRANSACTION_DATES_CHRONOLOGICAL
+    blocking: false
+    description: "Transaction dates must be non-decreasing"
+    expr: "is_chronological(tables.transactions.date)"
+    reason_code: "DATES_NON_CHRONOLOGICAL"
+forensics:
+  expected_producers_hint: ["system-generated", "banking", "core-banking", "microsoft: print to pdf"]
+  flag_editor_producers: true
+  require_single_revision: true
+  check_font_uniformity: true

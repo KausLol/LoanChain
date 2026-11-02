@@ -1,0 +1,60 @@
+id: id_employee.default
+version: 1.0.0
+docType: IDCard
+extends: null
+anchors:
+  - ["employee id card", "identity card", "employee identification card", "sample employee id card"]
+  - ["employee information", "organization", "full name", "employee id", "valid until"]
+fields:
+  full_name:
+    aliases: ["Full Name", "Employee Name", "Name", "Cardholder Name"]
+    type: name
+    required: true
+  organization:
+    aliases: ["Organization", "Company", "Company Name", "Employer"]
+    type: text
+    required: true
+  employee_id:
+    aliases: ["Employee ID", "Emp ID", "Staff ID", "Badge No"]
+    type: id
+    required: true
+  designation:
+    aliases: ["Designation", "Role", "Position"]
+    type: text
+    required: false
+  department:
+    aliases: ["Department", "Dept"]
+    type: text
+    required: false
+  date_of_joining:
+    aliases: ["Date of Joining", "Joining Date", "DOJ", "Issue Date"]
+    type: date
+    required: false
+  valid_until:
+    aliases: ["Valid Until", "Expiry Date", "Valid Thru", "Expiration"]
+    type: date
+    required: false
+  work_location:
+    aliases: ["Work Location", "Location", "Branch"]
+    type: text
+    required: false
+  email:
+    aliases: ["Email", "E-mail", "Official Email"]
+    type: text
+    required: false
+rules:
+  - id: ID_NOT_EXPIRED
+    blocking: true
+    description: "ID card must be currently valid and not expired"
+    expr: "fields.valid_until >= today"
+    reason_code: "ID_EXPIRED"
+  - id: VALIDITY_DATES_LOGICAL
+    blocking: false
+    description: "Date of joining must precede expiration date"
+    expr: "fields.date_of_joining <= fields.valid_until"
+    reason_code: "INVALID_VALIDITY_INTERVAL"
+forensics:
+  expected_producers_hint: ["system-generated", "id-printer", "microsoft: print to pdf"]
+  flag_editor_producers: true
+  require_single_revision: true
+  check_font_uniformity: true

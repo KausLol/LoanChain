@@ -1,0 +1,40 @@
+id: id_aadhaar.default
+version: 1.0.0
+docType: IDCard
+extends: null
+anchors:
+  - ["unique identification authority of india", "uidai", "aadhaar", "government of india"]
+  - ["mera aadhaar", "enrolment", "dob", "gender", "vid", "help@uidai.gov.in"]
+fields:
+  aadhaar_number:
+    aliases: ["Aadhaar Number", "Aadhaar No", "UID", "12 Digit Aadhaar Number"]
+    type: aadhaar
+    required: true
+  full_name:
+    aliases: ["Name", "Full Name"]
+    type: name
+    required: true
+  dob:
+    aliases: ["Date of Birth", "DOB", "Year of Birth", "YOB"]
+    type: date
+    required: true
+  gender:
+    aliases: ["Gender", "Sex"]
+    type: text
+    required: false
+rules:
+  - id: AADHAAR_VERHOEFF_CHECKSUM
+    blocking: true
+    description: "Aadhaar 12-digit number must satisfy the Verhoeff checksum algorithm"
+    expr: "is_valid_aadhaar_verhoeff(fields.aadhaar_number)"
+    reason_code: "INVALID_AADHAAR_CHECKSUM"
+  - id: APPLICANT_AGE_ADULT
+    blocking: true
+    description: "Applicant age based on DOB must be at least 18 years"
+    expr: "age_in_years(fields.dob, today) >= 18"
+    reason_code: "APPLICANT_UNDERAGE"
+forensics:
+  expected_producers_hint: ["uidai", "eaadhaar", "scanner"]
+  flag_editor_producers: true
+  require_single_revision: true
+  check_font_uniformity: true

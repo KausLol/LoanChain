@@ -6,7 +6,10 @@ export const CONTRACT_ADDRESSES = {
   DocumentRegistry: import.meta.env.VITE_DOC_REGISTRY       || "0x0000000000000000000000000000000000000000",
   ConsentManager:   import.meta.env.VITE_CONSENT_MANAGER    || "0x0000000000000000000000000000000000000000",
   LoanApplication:  import.meta.env.VITE_LOAN_APPLICATION   || "0x0000000000000000000000000000000000000000",
+  AIAttestation:    import.meta.env.VITE_AI_ATTESTATION    || "0x0000000000000000000000000000000000000000",
 };
+
+export const AI_SERVICE_URL = import.meta.env.VITE_AI_SERVICE_URL || "http://localhost:8000";
 
 export const SEPOLIA_CHAIN_ID = "0xaa36a7"; // 11155111 in hex
 
@@ -81,10 +84,32 @@ export const LOAN_APPLICATION_ABI = [
   "function getLoanAuditLength() view returns (uint256)",
   "function getLoanAuditEntry(uint256 _index) view returns (uint256 loanId, uint8 fromStatus, uint8 toStatus, address actor, string note, uint256 timestamp)",
   "function getTotalLoans() view returns (uint256)",
+  "function aiAttestation() view returns (address)",
+  "function requireAIForDocsVerified() view returns (bool)",
+  "function setAIAttestation(address _aiAttestation) external",
+  "function setRequireAIForDocsVerified(bool _require) external",
   "event LoanSubmitted(uint256 indexed loanId, address indexed applicant, uint256 amount, uint256 timestamp)",
   "event LoanStatusChanged(uint256 indexed loanId, uint8 indexed from, uint8 indexed to, address actor, uint256 timestamp)",
   "event CounterOfferMade(uint256 indexed loanId, uint256 newAmount, uint256 newTenure, string note, uint256 timestamp)",
   "event LoanDisbursed(uint256 indexed loanId, address indexed applicant, uint256 amount, uint256 timestamp)",
+  "event AIAttestationUpdated(address indexed oldAddress, address indexed newAddress)",
+  "event RequireAIUpdated(bool required)",
+];
+
+export const AI_ATTESTATION_ABI = [
+  "function owner() view returns (address)",
+  "function aiSigner() view returns (address)",
+  "function documentRegistry() view returns (address)",
+  "function domainSeparator() view returns (bytes32)",
+  "function usedNonces(uint256) view returns (bool)",
+  "function hasAttestation(bytes32 docId) view returns (bool)",
+  "function submitAttestation((bytes32 docId, bytes32 docHash, uint8 verdict, uint16 confidenceBps, bytes32 templateRef, bytes32 modelVersion, bytes32 explanationHash, uint256 nonce, uint256 deadline) att, bytes signature) external",
+  "function getLatestAttestation(bytes32 docId) view returns (tuple(bytes32 docId, bytes32 docHash, uint8 verdict, uint16 confidenceBps, bytes32 templateRef, bytes32 modelVersion, bytes32 explanationHash, uint256 nonce, uint256 deadline))",
+  "function getAttestationHistoryLength(bytes32 docId) view returns (uint256)",
+  "function getAttestationAt(bytes32 docId, uint256 index) view returns (tuple(bytes32 docId, bytes32 docHash, uint8 verdict, uint16 confidenceBps, bytes32 templateRef, bytes32 modelVersion, bytes32 explanationHash, uint256 nonce, uint256 deadline))",
+  "function bundleVerdict(bytes32[] docIds) view returns (uint8 verdict, uint256 attestedCount)",
+  "event DocumentAIAttested(bytes32 indexed docId, uint8 verdict, uint16 confidenceBps, bytes32 explanationHash, address indexed submitter, uint256 timestamp)",
+  "event AISignerUpdated(address indexed oldSigner, address indexed newSigner)",
 ];
 
 // ─── Enum Labels ─────────────────────────────────────────────────────────────
@@ -129,3 +154,15 @@ export const DOC_STATUS_LABELS = [
   "Rejected",
   "Revoked",
 ];
+
+export const AI_VERDICT_LABELS = [
+  "Approved",
+  "Borderline",
+  "Rejected",
+];
+
+export const AI_VERDICT_BADGES = {
+  0: "badge-approved",
+  1: "badge-review",
+  2: "badge-rejected",
+};

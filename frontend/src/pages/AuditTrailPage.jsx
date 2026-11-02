@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from "react";
 import { useWeb3 } from "../context/Web3Context";
 import { useLoans } from "../hooks/useBlockchain";
 import { LOAN_STATUS_LABELS } from "../config/contracts";
-import { History, User, ArrowRight, RefreshCw } from "lucide-react";
+import AIBadge from "../components/AIBadge";
+import { History, User, ArrowRight, RefreshCw, Shield, ExternalLink } from "lucide-react";
 import { ethers } from "ethers";
 
 function formatDateTime(ts) {
@@ -48,6 +49,7 @@ export default function AuditTrailPage() {
   const [loans, setLoans] = useState([]);
   const [docAudit, setDocAudit] = useState([]);
   const [loanAudit, setLoanAudit] = useState([]);
+  const [aiAudit, setAiAudit] = useState([]);
   const [selectedLoan, setSelectedLoan] = useState("");
   const [tab, setTab] = useState("loan");
   const [refreshing, setRefreshing] = useState(false);
@@ -105,10 +107,43 @@ export default function AuditTrailPage() {
     }
   }, [contracts]);
 
+  const loadAIAudit = useCallback(async () => {
+    if (!contracts?.aiAttestation) {
+      setAiAudit([]);
+      return;
+    }
+    try {
+      const filter = contracts.aiAttestation.filters.DocumentAIAttested();
+      const provider = contracts.aiAttestation.runner?.provider || contracts.aiAttestation.provider;
+      let fromBlock = 0;
+      if (provider) {
+        try {
+          const currentBlock = await provider.getBlockNumber();
+          fromBlock = Math.max(0, currentBlock - 25000);
+        } catch {}
+      }
+      const events = await contracts.aiAttestation.queryFilter(filter, fromBlock, "latest");
+      const mapped = events.map((ev) => ({
+        docId: ev.args[0],
+        verdict: Number(ev.args[1]),
+        confidenceBps: Number(ev.args[2]),
+        explanationHash: ev.args[3],
+        submitter: ev.args[4],
+        timestamp: Number(ev.args[5]),
+        txHash: ev.transactionHash,
+      }));
+      setAiAudit(mapped.reverse());
+    } catch (err) {
+      console.warn("Could not load AI attestation events:", err);
+      setAiAudit([]);
+    }
+  }, [contracts]);
+
   useEffect(() => {
     if (tab === "loan" && selectedLoan) loadLoanAudit(selectedLoan);
     if (tab === "doc") loadDocAudit();
-  }, [tab, selectedLoan, loadLoanAudit, loadDocAudit]);
+    if (tab === "ai") loadAIAudit();
+  }, [tab, selectedLoan, loadLoanAudit, loadDocAudit, loadAIAudit]);
 
   return (
     <div>
@@ -138,6 +173,12 @@ export default function AuditTrailPage() {
           onClick={() => setTab("doc")}
         >
           Document Audit Trail
+        </button>
+        <button
+          className={`btn btn-sm ${tab === "ai" ? "btn-primary" : "btn-outline"}`}
+          onClick={() => setTab("ai")}
+        >
+          AI Attestations
         </button>
       </div>
 
@@ -248,6 +289,74 @@ export default function AuditTrailPage() {
                         <span style={{ fontSize: "12px", color: "var(--primary)", fontWeight: 500 }}>
                           EVM Verified
                         </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === "ai" && (
+        <div className="card">
+          <div className="card-title-row">
+            <h2 className="card-title">On-Chain AI Attestations (EIP-712)</h2>
+            <span className="status-badge badge-verified">AIAttestation.sol</span>
+          </div>
+          {aiAudit.length === 0 ? (
+            <div className="empty-placeholder">
+              <Shield size={36} className="empty-placeholder-icon" />
+              <div className="empty-placeholder-title">No AI Attestations Anchored Yet</div>
+              <p className="empty-placeholder-desc">
+                When document verification results are signed and anchored on Sepolia, their cryptographic attestations will be indexed here.
+              </p>
+            </div>
+          ) : (
+            <div className="table-container">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>Document ID</th>
+                    <th>AI Verdict</th>
+                    <th>Submitter</th>
+                    <th>Explanation Hash</th>
+                    <th>Transaction</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {aiAudit.map((att, idx) => (
+                    <tr key={idx}>
+                      <td>{formatDateTime(att.timestamp)}</td>
+                      <td>
+                        <span className="hash-tag">{att.docId ? `${att.docId.slice(0, 10)}…${att.docId.slice(-8)}` : "—"}</span>
+                      </td>
+                      <td>
+                        <AIBadge verdict={att.verdict} confidenceBps={att.confidenceBps} size="sm" />
+                      </td>
+                      <td>{shortAddr(att.submitter)}</td>
+                      <td>
+                        <span className="hash-tag" title={att.explanationHash}>
+                          {att.explanationHash ? `${att.explanationHash.slice(0, 10)}…${att.explanationHash.slice(-8)}` : "—"}
+                        </span>
+                      </td>
+                      <td>
+                        {att.txHash ? (
+                          <a
+                            href={`https://sepolia.etherscan.io/tx/${att.txHash}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="hash-tag"
+                            style={{ color: "var(--primary)" }}
+                          >
+                            <ExternalLink size={11} />
+                            <span>{att.txHash.slice(0, 8)}…</span>
+                          </a>
+                        ) : (
+                          "—"
+                        )}
                       </td>
                     </tr>
                   ))}

@@ -4,6 +4,10 @@ pragma solidity ^0.8.19;
 import "./DocumentRegistry.sol";
 import "./IssuerRegistry.sol";
 
+interface IAIAttestation {
+    function bundleVerdict(bytes32[] calldata docIds) external view returns (uint8 verdict, uint256 attestedCount);
+}
+
 /**
  * @title LoanApplication
  * @notice Full loan lifecycle with state machine
@@ -13,6 +17,8 @@ contract LoanApplication {
     DocumentRegistry public documentRegistry;
     IssuerRegistry public issuerRegistry;
     address public owner; // bank admin
+    address public aiAttestation;
+    bool public requireAIForDocsVerified;
 
     enum LoanStatus {
         Submitted,          // 0
@@ -72,6 +78,8 @@ contract LoanApplication {
     event LoanAssigned(uint256 indexed loanId, address indexed officer, uint256 timestamp);
     event CounterOfferMade(uint256 indexed loanId, uint256 newAmount, uint256 newTenure, string note, uint256 timestamp);
     event LoanDisbursed(uint256 indexed loanId, address indexed applicant, uint256 amount, uint256 timestamp);
+    event AIAttestationUpdated(address indexed oldAddress, address indexed newAddress);
+    event RequireAIUpdated(bool required);
 
     modifier onlyOwner() {
         require(msg.sender == owner, "LoanApplication: Only owner");
@@ -114,6 +122,19 @@ contract LoanApplication {
         require(_officer != owner, "LoanApplication: Cannot remove owner");
         officers[_officer] = false;
         emit OfficerRemoved(_officer, block.timestamp);
+    }
+
+    // ─── AI Attestation Integration ───────────────────────────────────
+
+    function setAIAttestation(address _aiAttestation) external onlyOwner {
+        address old = aiAttestation;
+        aiAttestation = _aiAttestation;
+        emit AIAttestationUpdated(old, _aiAttestation);
+    }
+
+    function setRequireAIForDocsVerified(bool _require) external onlyOwner {
+        requireAIForDocsVerified = _require;
+        emit RequireAIUpdated(_require);
     }
 
     // ─── Loan Submission ──────────────────────────────────────────────
@@ -166,7 +187,17 @@ contract LoanApplication {
         LoanApp storage loan = loans[_loanId];
         require(loan.status == LoanStatus.Submitted || loan.status == LoanStatus.NeedsMoreDocs,
             "LoanApplication: Invalid transition");
-        _changeStatus(_loanId, LoanStatus.DocsVerified, msg.sender, "Documents verified");
+
+        string memory auditNote = "Documents verified";
+        if (requireAIForDocsVerified) {
+            require(aiAttestation != address(0), "LoanApplication: AI attestation contract not set");
+            (uint8 verdict, uint256 attestedCount) = IAIAttestation(aiAttestation).bundleVerdict(loan.docIds);
+            require(verdict != 2, "LoanApplication: AI verification rejected one or more documents");
+            require(attestedCount == loan.docIds.length, "LoanApplication: Not all documents have AI attestations");
+            auditNote = verdict == 0 ? "Documents verified (AI bundle passed)" : "Documents verified (AI bundle borderline reviewed)";
+        }
+
+        _changeStatus(_loanId, LoanStatus.DocsVerified, msg.sender, auditNote);
     }
 
     function markUnderReview(uint256 _loanId) external onlyOfficer validLoan(_loanId) {

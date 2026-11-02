@@ -1,0 +1,8 @@
+{
+  "fixture": "tampered_statement_running_bal.pdf",
+  "description": "Bank statement with a forged balance row that breaks arithmetic continuity",
+  "expected_verdict": 2,
+  "expected_reasons": [
+    "RUNNING_BALANCE_DISCONTINUITY"
+  ]
+}

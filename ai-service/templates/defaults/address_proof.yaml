@@ -1,0 +1,39 @@
+id: address_proof.default
+version: 1.0.0
+docType: AddressProof
+extends: null
+anchors:
+  - ["utility bill", "electricity bill", "water bill", "telephone bill", "gas bill", "proof of address"]
+  - ["consumer number", "billing period", "bill date", "service address", "consumer address"]
+fields:
+  resident_name:
+    aliases: ["Consumer Name", "Name", "Customer Name", "Resident"]
+    type: name
+    required: true
+  service_address:
+    aliases: ["Service Address", "Premises", "Consumer Address", "Address"]
+    type: text
+    required: true
+  bill_date:
+    aliases: ["Bill Date", "Issue Date", "Date"]
+    type: date
+    required: true
+  consumer_number:
+    aliases: ["Consumer No", "Account No", "Customer ID", "Connection No"]
+    type: id
+    required: false
+  amount_payable:
+    aliases: ["Amount Payable", "Total Amount Due", "Net Amount"]
+    type: money
+    required: false
+rules:
+  - id: RECENT_BILL_DATE
+    blocking: false
+    description: "Address proof utility bill must be within recency threshold"
+    expr: "months_between(fields.bill_date, today) <= thresholds.recency.address_proof_max_age_months"
+    reason_code: "ADDRESS_PROOF_STALE"
+forensics:
+  expected_producers_hint: ["utility", "billing", "system-generated", "scanner"]
+  flag_editor_producers: true
+  require_single_revision: true
+  check_font_uniformity: true

@@ -8,6 +8,7 @@ import {
   DOCUMENT_REGISTRY_ABI,
   CONSENT_MANAGER_ABI,
   LOAN_APPLICATION_ABI,
+  AI_ATTESTATION_ABI,
 } from "../config/contracts";
 
 const Web3Context = createContext(null);
@@ -31,6 +32,7 @@ export function Web3Provider({ children }) {
       documentRegistry: new ethers.Contract(CONTRACT_ADDRESSES.DocumentRegistry, DOCUMENT_REGISTRY_ABI, s),
       consentManager:   new ethers.Contract(CONTRACT_ADDRESSES.ConsentManager,   CONSENT_MANAGER_ABI,   s),
       loanApplication:  new ethers.Contract(CONTRACT_ADDRESSES.LoanApplication,  LOAN_APPLICATION_ABI,  s),
+      aiAttestation:    new ethers.Contract(CONTRACT_ADDRESSES.AIAttestation,    AI_ATTESTATION_ABI,    s),
     };
   }, []);
 

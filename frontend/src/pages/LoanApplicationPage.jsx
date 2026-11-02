@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { useWeb3 } from "../context/Web3Context";
 import { useLoans, useDocuments } from "../hooks/useBlockchain";
 import { DOC_TYPE_LABELS } from "../config/contracts";
-import { Send, FileText, CheckCircle2, XCircle, AlertCircle, Paperclip, ChevronRight, ArrowLeft } from "lucide-react";
+import AIBadge from "../components/AIBadge";
+import { Send, FileText, CheckCircle2, XCircle, AlertCircle, ChevronRight, ArrowLeft } from "lucide-react";
 
 const PURPOSES = [
   "Personal Loan",
@@ -45,10 +46,43 @@ export default function LoanApplicationPage({ setPage }) {
 
   useEffect(() => {
     if (!contracts || !account) return;
-    getMyDocuments(account).then((docs) => {
-      setMyDocs(docs);
-      if (docs.length > 0) {
-        setSelected([docs[0].id]);
+    getMyDocuments(account).then(async (docs) => {
+      if (!docs) {
+        setMyDocs([]);
+        return;
+      }
+      let enriched = docs;
+      if (contracts.aiAttestation && docs.length > 0) {
+        enriched = await Promise.all(
+          docs.map(async (doc) => {
+            try {
+              const has = await contracts.aiAttestation.hasAttestation(doc.id);
+              if (has) {
+                const att = await contracts.aiAttestation.getLatestAttestation(doc.id);
+                return {
+                  ...doc,
+                  aiAttestation: {
+                    verdict: Number(att[2]),
+                    confidenceBps: Number(att[3]),
+                    templateRef: att[4],
+                  },
+                };
+              }
+            } catch (err) {
+              console.warn("Could not query AI attestation for doc", doc.id, err);
+            }
+            return doc;
+          })
+        );
+      }
+      setMyDocs(enriched);
+      if (enriched.length > 0) {
+        const approvedDocs = enriched.filter((d) => d.aiAttestation?.verdict === 0);
+        if (approvedDocs.length > 0) {
+          setSelected(approvedDocs.map((d) => d.id));
+        } else {
+          setSelected([enriched[0].id]);
+        }
       }
     });
   }, [contracts, account, getMyDocuments]);
@@ -398,12 +432,24 @@ export default function LoanApplicationPage({ setPage }) {
                         <div style={{ fontWeight: 600, fontSize: "13.5px" }}>
                           {DOC_TYPE_LABELS[doc.docType] || "Salary Slip"}
                         </div>
-                        <div style={{ fontSize: "12px", color: "#6b7280", fontFamily: "monospace" }}>
-                          Doc ID: {doc.id.slice(0, 16)}…
+                        <div style={{ fontSize: "11.5px", color: "#6b7280", fontFamily: "monospace", display: "flex", gap: "10px", marginTop: "2px" }}>
+                          <span>ID: {doc.id.slice(0, 8)}…{doc.id.slice(-6)}</span>
+                          <span>Hash: {doc.docHash?.slice(0, 10)}…{doc.docHash?.slice(-6)}</span>
                         </div>
                       </div>
                     </div>
-                    <span className="status-badge badge-verified">Verified on Chain</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <AIBadge
+                        verdict={doc.aiAttestation?.verdict}
+                        confidenceBps={doc.aiAttestation?.confidenceBps}
+                        size="sm"
+                      />
+                      {doc.aiAttestation?.verdict === 0 ? (
+                        <span className="status-badge badge-approved">Anchored on Chain</span>
+                      ) : (
+                        <span className="status-badge badge-submitted">Registered</span>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -462,6 +508,17 @@ export default function LoanApplicationPage({ setPage }) {
               Bank officers review the attested hashes directly via the smart contract.
             </div>
           </div>
+
+          {selectedDocs.some(
+            (id) => !myDocs.find((d) => d.id === id)?.aiAttestation
+          ) && (
+            <div className="alert-box warning" style={{ marginBottom: "20px" }}>
+              <AlertCircle size={18} style={{ flexShrink: 0, marginTop: "1px" }} />
+              <div>
+                <strong>Advisory:</strong> One or more selected documents do not have on-chain AI verification attestations. You may still submit, but loan officers may request AI verification before marking documents verified.
+              </div>
+            </div>
+          )}
 
           <div style={{ display: "flex", justifyContent: "space-between" }}>
             <button className="btn btn-outline" onClick={() => setStep(2)}>

@@ -1,0 +1,46 @@
+id: id_pan.default
+version: 1.0.0
+docType: IDCard
+extends: null
+anchors:
+  - ["income tax department", "permanent account number", "pan card", "govt. of india"]
+  - ["father's name", "date of birth", "pan", "signature", "permanent account number card"]
+fields:
+  pan:
+    aliases: ["Permanent Account Number", "PAN", "PAN No", "Card Number"]
+    type: pan
+    required: true
+    regex: "^[A-Z]{5}[0-9]{4}[A-Z]$"
+  full_name:
+    aliases: ["Name", "Full Name", "Cardholder Name"]
+    type: name
+    required: true
+  fathers_name:
+    aliases: ["Father's Name", "Father Name"]
+    type: name
+    required: false
+  dob:
+    aliases: ["Date of Birth", "DOB", "Birth Date"]
+    type: date
+    required: true
+rules:
+  - id: PAN_SYNTAX_VALID
+    blocking: true
+    description: "PAN must follow standard Indian 10-character alphanumeric structure"
+    expr: "is_valid_pan(fields.pan)"
+    reason_code: "INVALID_PAN_FORMAT"
+  - id: PAN_INDIVIDUAL_STATUS
+    blocking: false
+    description: "Fourth character of PAN must be P for individual applicants"
+    expr: "fields.pan[3] == 'P'"
+    reason_code: "PAN_NOT_INDIVIDUAL"
+  - id: APPLICANT_AGE_ADULT
+    blocking: true
+    description: "Applicant age based on DOB must be at least 18 years"
+    expr: "age_in_years(fields.dob, today) >= 18"
+    reason_code: "APPLICANT_UNDERAGE"
+forensics:
+  expected_producers_hint: ["uti", "nsdl", "income-tax", "scanner"]
+  flag_editor_producers: true
+  require_single_revision: true
+  check_font_uniformity: true

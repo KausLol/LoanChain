@@ -1,0 +1,8 @@
+{
+  "fixture": "tampered_metadata_editor.pdf",
+  "description": "Salary slip created or edited in Photoshop / Canva",
+  "expected_verdict": 1,
+  "expected_reasons": [
+    "META_EDITOR_PRODUCER"
+  ]
+}
