@@ -141,7 +141,8 @@ export const LOAN_STATUS_COLORS = {
 export const DOC_TYPE_LABELS = [
   "Salary Slip",
   "Bank Statement",
-  "ID Card",
+  "Aadhaar Card",
+  "PAN Card",
   "Address Proof",
   "IT Return",
   "Other",

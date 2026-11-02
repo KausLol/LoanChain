@@ -3,6 +3,8 @@ import { useWeb3 } from "../context/Web3Context";
 import { useLoans, useDocuments } from "../hooks/useBlockchain";
 import { DOC_TYPE_LABELS } from "../config/contracts";
 import AIBadge from "../components/AIBadge";
+import AIAffordabilityCard from "../components/AIAffordabilityCard";
+import { analyzeAffordability } from "../services/aiService";
 import { Send, FileText, CheckCircle2, XCircle, AlertCircle, ChevronRight, ArrowLeft } from "lucide-react";
 
 const PURPOSES = [
@@ -35,6 +37,8 @@ export default function LoanApplicationPage({ setPage }) {
   const [success, setSuccess] = useState(null);
   const [submitErr, setSubmitErr] = useState(null);
   const [step, setStep] = useState(1);
+  const [affordability, setAffordability] = useState(null);
+  const [affordabilityLoading, setAffordabilityLoading] = useState(false);
 
   const [form, setForm] = useState({
     amount: "0.5",
@@ -43,6 +47,43 @@ export default function LoanApplicationPage({ setPage }) {
     purpose: PURPOSES[0],
     customPurpose: "",
   });
+
+  // Calculate advisory loan affordability based on selected parameters & documents
+  useEffect(() => {
+    let active = true;
+    const amt = parseFloat(form.amount);
+    const ten = parseInt(form.tenure);
+    const rate = parseInt(form.interestRate) || 850;
+
+    // Only analyze affordability if documents are actually selected
+    if (!amt || amt <= 0 || !ten || ten <= 0 || !selectedDocs || selectedDocs.length === 0) {
+      setAffordability(null);
+      setAffordabilityLoading(false);
+      return;
+    }
+
+    setAffordabilityLoading(true);
+    analyzeAffordability({
+      docIds: selectedDocs,
+      loanAmount: amt,
+      tenure: ten,
+      interestRate: rate,
+    })
+      .then((res) => {
+        if (active) {
+          setAffordability(res);
+          setAffordabilityLoading(false);
+        }
+      })
+      .catch((err) => {
+        console.warn("Affordability preview failed:", err);
+        if (active) setAffordabilityLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [form.amount, form.tenure, form.interestRate, selectedDocs]);
 
   useEffect(() => {
     if (!contracts || !account) return;
@@ -76,14 +117,7 @@ export default function LoanApplicationPage({ setPage }) {
         );
       }
       setMyDocs(enriched);
-      if (enriched.length > 0) {
-        const approvedDocs = enriched.filter((d) => d.aiAttestation?.verdict === 0);
-        if (approvedDocs.length > 0) {
-          setSelected(approvedDocs.map((d) => d.id));
-        } else {
-          setSelected([enriched[0].id]);
-        }
-      }
+      // User selects documents in Step 2; do not pre-select automatically on initial load
     });
   }, [contracts, account, getMyDocuments]);
 
@@ -358,7 +392,7 @@ export default function LoanApplicationPage({ setPage }) {
             </div>
           </div>
 
-          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "16px" }}>
             <button className="btn btn-primary" onClick={() => setStep(2)}>
               <span>Continue to Documents</span>
               <ChevronRight size={15} />
@@ -371,15 +405,31 @@ export default function LoanApplicationPage({ setPage }) {
       {step === 2 && (
         <div className="card">
           <div className="card-title-row">
-            <h2 className="card-title">Select Verified Documents</h2>
-            <span className="status-badge badge-submitted">{selectedDocs.length} Selected</span>
+            <div>
+              <h2 className="card-title">Select Verified Documents</h2>
+              <p className="card-desc" style={{ marginTop: "4px", marginBottom: 0 }}>
+                Attach document hashes from your registry to prove income and identity on-chain.
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              {myDocs.some((d) => d.aiAttestation?.verdict === 0) && (
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  onClick={() => {
+                    const approved = myDocs.filter((d) => d.aiAttestation?.verdict === 0).map((d) => d.id);
+                    setSelected(approved);
+                  }}
+                >
+                  Select All Verified
+                </button>
+              )}
+              <span className="status-badge badge-submitted">{selectedDocs.length} Selected</span>
+            </div>
           </div>
-          <p className="card-desc">
-            Attach document hashes from your registry to prove income and identity on-chain.
-          </p>
 
           {myDocs.length === 0 ? (
-            <div className="alert-box warning">
+            <div className="alert-box warning" style={{ marginTop: "16px" }}>
               <AlertCircle size={18} style={{ flexShrink: 0, marginTop: "1px" }} />
               <div>
                 No document hashes found in your registry yet. Please upload your salary slip or bank statement first.
@@ -391,7 +441,7 @@ export default function LoanApplicationPage({ setPage }) {
               </div>
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "20px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px", margin: "16px 0 20px" }}>
               {myDocs.map((doc) => {
                 const isSelected = selectedDocs.includes(doc.id);
                 return (
@@ -478,7 +528,7 @@ export default function LoanApplicationPage({ setPage }) {
         <div className="card">
           <h2 className="card-title" style={{ marginBottom: "16px" }}>Review & Submit to Sepolia</h2>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "20px" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "16px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderBottom: "1px solid var(--border-color)" }}>
               <span style={{ color: "#6b7280" }}>Loan Amount</span>
               <span style={{ fontWeight: 700, fontSize: "15px" }}>{form.amount} ETH</span>
@@ -497,8 +547,59 @@ export default function LoanApplicationPage({ setPage }) {
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderBottom: "1px solid var(--border-color)" }}>
               <span style={{ color: "#6b7280" }}>Attached Documents</span>
-              <span style={{ fontWeight: 600 }}>{selectedDocs.length} Document Bundle(s)</span>
+              <span style={{ fontWeight: 600 }}>{selectedDocs.length} Document(s) Selected</span>
             </div>
+          </div>
+
+          {/* Selected Documents Breakdown */}
+          {selectedDocs.length > 0 && (
+            <div style={{ marginBottom: "16px", padding: "12px", background: "#f8fafc", borderRadius: "6px", border: "1px solid var(--border-color)" }}>
+              <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>
+                Selected Documents for this Application ({selectedDocs.length}):
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                {selectedDocs.map((docId) => {
+                  const doc = myDocs.find((d) => d.id === docId);
+                  return (
+                    <div
+                      key={docId}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        background: "#ffffff",
+                        border: "1px solid var(--border-color)",
+                        borderRadius: "4px",
+                        padding: "5px 10px",
+                        fontSize: "12px",
+                      }}
+                    >
+                      <FileText size={13} color="#1e3a5f" />
+                      <span style={{ fontWeight: 600, color: "var(--text-main)" }}>
+                        {doc ? DOC_TYPE_LABELS[doc.docType] || "Document" : "Document"}
+                      </span>
+                      <span className="hash-tag" style={{ fontSize: "11px" }}>
+                        {docId.slice(0, 6)}…{docId.slice(-4)}
+                      </span>
+                      {doc?.aiAttestation?.verdict === 0 && (
+                        <span style={{ fontSize: "10px", color: "#16a34a", fontWeight: 600 }}>✓ AI Verified</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* AI Loan Affordability Analysis on Selected Documents */}
+          <div style={{ marginBottom: "16px" }}>
+            {affordabilityLoading ? (
+              <div style={{ padding: "18px", textAlign: "center", background: "#f8fafc", borderRadius: "6px", border: "1px solid var(--border-color)", fontSize: "12.5px", color: "#64748b" }}>
+                Analyzing affordability based on selected documents…
+              </div>
+            ) : (
+              affordability && <AIAffordabilityCard affordability={affordability} />
+            )}
           </div>
 
           <div className="alert-box info" style={{ marginBottom: "20px" }}>

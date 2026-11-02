@@ -1,6 +1,6 @@
 id: id_pan.default
 version: 1.0.0
-docType: IDCard
+docType: PANCard
 extends: null
 anchors:
   - ["income tax department", "permanent account number", "pan card", "govt. of india"]

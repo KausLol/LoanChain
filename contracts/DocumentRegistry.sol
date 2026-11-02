@@ -12,7 +12,7 @@ contract DocumentRegistry {
     IssuerRegistry public issuerRegistry;
     address public owner;
 
-    enum DocType { SalarySlip, BankStatement, IDCard, AddressProof, ITReturn, Other }
+    enum DocType { SalarySlip, BankStatement, AadhaarCard, PANCard, AddressProof, ITReturn, Other }
     enum DocStatus { Pending, IssuerAttested, Verified, Rejected, Revoked }
 
     struct Document {

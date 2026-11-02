@@ -7,10 +7,11 @@ from app.models.template import TemplateSchema
 DOC_TYPE_NAMES = {
     0: "SalarySlip",
     1: "BankStatement",
-    2: "IDCard",
-    3: "AddressProof",
-    4: "ITReturn",
-    5: "Other",
+    2: "AadhaarCard",
+    3: "PANCard",
+    4: "AddressProof",
+    5: "ITReturn",
+    6: "Other",
 }
 
 DOC_TYPE_INTEGERS = {v: k for k, v in DOC_TYPE_NAMES.items()}

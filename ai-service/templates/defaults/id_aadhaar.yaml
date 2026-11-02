@@ -1,6 +1,6 @@
 id: id_aadhaar.default
 version: 1.0.0
-docType: IDCard
+docType: AadhaarCard
 extends: null
 anchors:
   - ["unique identification authority of india", "uidai", "aadhaar", "government of india"]

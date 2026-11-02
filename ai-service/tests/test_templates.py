@@ -14,7 +14,8 @@ def test_template_registry_loaded():
     doc_types = {t.docType for t in templates}
     assert "SalarySlip" in doc_types
     assert "BankStatement" in doc_types
-    assert "IDCard" in doc_types
+    assert "AadhaarCard" in doc_types
+    assert "PANCard" in doc_types
     assert "ITReturn" in doc_types
     assert "AddressProof" in doc_types
     assert "Other" in doc_types

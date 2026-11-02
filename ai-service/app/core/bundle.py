@@ -3,19 +3,24 @@ from typing import List, Optional
 from rapidfuzz import fuzz
 from app.models.result import VerificationResult, BundleResult, VerdictEnum
 from app.models.facts import RuleEvaluation
+from app.core.affordability import evaluate_affordability
 
 
 def verify_bundle(
     doc_results: List[VerificationResult],
     loan_id: Optional[int] = None,
+    loan_amount_eth: Optional[float] = None,
+    tenure_months: Optional[int] = None,
+    interest_rate_bps: Optional[int] = None,
 ) -> BundleResult:
     """
     Executes cross-document bundle consistency verification:
-    1. Name matching (fuzzy token-set-ratio across ID, Salary Slip, Statement)
+    1. Name matching (fuzzy token-set-ratio across ID/Aadhaar/PAN, Salary Slip, Statement)
     2. PAN consistency
     3. Account number consistency
     4. Salary credit reconciliation (statement credit == slip net pay ±2%)
-    5. Advisory suggested action generation
+    5. AI-assisted loan affordability analysis
+    6. Advisory suggested action generation
     """
     bundle_checks: List[RuleEvaluation] = []
     doc_ids = [r.doc_id for r in doc_results]
@@ -23,7 +28,7 @@ def verify_bundle(
     # Partition documents by template docType
     salary_slips = [r for r in doc_results if "salary_slip" in r.template_ref]
     bank_stmts = [r for r in doc_results if "bank_statement" in r.template_ref]
-    id_cards = [r for r in doc_results if "id_" in r.template_ref]
+    id_cards = [r for r in doc_results if "id_" in r.template_ref or "aadhaar" in r.template_ref or "pan" in r.template_ref]
 
     # 1. Cross-Document Name Matching
     id_name = None
@@ -169,6 +174,16 @@ def verify_bundle(
         suggested_action = "MarkDocsVerified"
         action_reasons.append("All submitted documents conform to declarative templates and cross-verify with 100% consistency.")
 
+    # 5. AI Loan Affordability Analysis
+    affordability = evaluate_affordability(
+        doc_results=doc_results,
+        loan_amount_eth=loan_amount_eth,
+        tenure_months=tenure_months,
+        interest_rate_bps=interest_rate_bps,
+    )
+    if affordability.affordability_verdict in ("High DTI / Stretched", "Unaffordable"):
+        action_reasons.append(f"Advisory Affordability Note: {affordability.summary}")
+
     summary = (
         f"Bundle verification verdict: {verdict_label}. "
         f"Suggested officer action: {suggested_action}. "
@@ -186,6 +201,7 @@ def verify_bundle(
         doc_results=doc_results,
         bundle_checks=bundle_checks,
         summary=summary,
+        affordability=affordability,
     )
 
 

@@ -148,30 +148,46 @@ Once verified, the AI service uses a private cryptographic key to generate an **
 | **Arithmetic Rule** | `closing_balance == opening_balance + total_deposits - total_withdrawals` | **Blocking Rule**. Tolerance: `abs(diff) <= 1.00` |
 | **Salary Credit Match** | Transaction description matches `SALARY` or employer name, credit amount equals `net_pay` | Tolerance: `abs(diff) <= 5.00` |
 
-### 3.3 Employee Identity Card (`id_employee@1.0.0`)
+### 3.3 Aadhaar Card (`id_aadhaar@1.0.0`)
 
 | Requirement | Specification | Notes |
 | :--- | :--- | :--- |
-| **Document Classification** | `docType == 2` | Mapped to `DOC_TYPE_LABELS[2]` |
-| **Mandatory Anchors** | `["employee id", "identity card", "staff id", "employee code"]` | At least 2 must be present |
-| **Required Fields** | `employee_name`, `employee_id`, `company_name` | Name compared against salary slip |
-| **Cross-Doc Rule** | Fuzzy name match (`token_set_ratio >= 85`) with salary slip name | Non-blocking warning if 70-84; fails if < 70 |
+| **Document Classification** | `docType == 2` | Mapped to `DOC_TYPE_LABELS[2]` (`Aadhaar Card`) |
+| **Mandatory Anchors** | `["unique identification authority of india", "uidai", "aadhaar", "government of india"]`, `["mera aadhaar", "enrolment", "dob", "gender", "vid", "help@uidai.gov.in"]` | Must match UIDAI official headers |
+| **Required Fields** | `aadhaar_number`, `full_name`, `dob` | Extracted and normalized |
+| **Format & Checksum** | 12-digit number satisfying Verhoeff checksum algorithm | Cannot begin with 0 or 1 |
+| **Age Requirement** | Minimum 18 years based on Date of Birth (`dob`) | Underage applicants rejected |
+| **Privacy Masking** | Stored strictly as `XXXX XXXX 1234` | Full Aadhaar number is never persisted or logged |
 
 ### 3.4 Income Tax PAN Card (`id_pan@1.0.0`)
 
 | Requirement | Specification | Notes |
 | :--- | :--- | :--- |
+| **Document Classification** | `docType == 3` | Mapped to `DOC_TYPE_LABELS[3]` (`PAN Card`) |
+| **Mandatory Anchors** | `["income tax department", "permanent account number", "pan card", "govt. of india"]`, `["father's name", "date of birth", "pan", "signature"]` | Official Income Tax Department anchors |
+| **Required Fields** | `pan`, `full_name`, `dob` | Extracted and normalized |
 | **Format Regex** | `^[A-Z]{5}[0-9]{4}[A-Z]$` | 10 alphanumeric characters |
-| **Entity Character (4th)** | `P` = Individual, `C` = Company, `H` = HUF, `F` = Firm | Standard Indian Income Tax syntax |
-| **Surname Initial (5th)** | Must match the first letter of the applicant's last name | Verified during field normalization |
+| **Entity Character (4th)** | `P` = Individual (`fields.pan[3] == 'P'`) | Must be individual entity for personal loans |
+| **Age Requirement** | Minimum 18 years based on Date of Birth (`dob`) | Adult applicant validation |
+| **Privacy Masking** | Masked as `ABCDE****F` | Only first 5 and last character visible in reports |
 
-### 3.5 Aadhaar Card (`id_aadhaar@1.0.0`)
+### 3.5 AI-Assisted Loan Affordability Analysis
 
-| Requirement | Specification | Notes |
+Connecting verified document facts directly to loan parameters, the AI service evaluates repayment capacity and Debt-to-Income (DTI) metrics:
+
+| Metric | Estimation Methodology | Formula / Standard |
 | :--- | :--- | :--- |
-| **Format Regex** | `^[2-9]{1}[0-9]{3}\s?[0-9]{4}\s?[0-9]{4}$` | 12 digits, cannot start with 0 or 1 |
-| **Checksum Algorithm** | Verhoeff algorithm | Base-10 dihedral group $D_5$ multiplication check |
-| **Privacy Masking** | Stored strictly as `XXXX XXXX 1234` | Full Aadhaar number is never retained or returned |
+| **Monthly Income** | Extracted and verified net salary from payslip or recurring bank deposits | $I = \text{net\_pay}$ or average monthly credits |
+| **Existing Obligations** | Detected debt deductions on payslip and recurring bank debits (EMIs/rent) | $O = \text{deductions}_{\text{recurring}} + \text{debits}_{\text{recurring}}$ |
+| **Current DTI** | Existing Debt-to-Income percentage before any new loan | $\text{DTI}_{\text{current}} = (O / I) \times 100\%$ |
+| **Safe EMI Range** | Conservative (40% FOIR) to ceiling (50% FOIR) available capacity | $\text{EMI}_{\text{safe}} = [0.40 \cdot I - O,\, 0.50 \cdot I - O]$ |
+| **Proposed Loan EMI** | Monthly repayment calculated using standard reducing-balance formula | $\text{EMI} = P \cdot r \cdot \frac{(1+r)^n}{(1+r)^n - 1}$ |
+| **Projected DTI** | Total debt obligations inclusive of requested loan EMI | $\text{DTI}_{\text{projected}} = \frac{O + \text{EMI}}{I} \times 100\%$ |
+| **Counter-Offer Suggestions** | If proposed EMI > safe ceiling, calculates adjusted principal or extended tenure | Principal clamped to safe capacity; tenure extended up to 84 months |
+| **Advisory Nature** | **Strictly human-in-the-loop**: recommendations are advisory only | Loan officer and smart contract remain authoritative |
+
+**Example Assessment Output:**
+> *“Verified monthly income: ₹50,000. Existing obligations: ₹8,000. Recommended EMI ceiling: ₹12,000–₹17,000. Result: Affordable with high confidence.”*
 
 ---
 
@@ -179,55 +195,74 @@ Once verified, the AI service uses a private cryptographic key to generate an **
 
 You can use commercial LLMs (ChatGPT, Claude, Gemini, DeepSeek) to generate synthetic PDFs for testing LoanChain. Follow the instructions and prompt templates below.
 
-### 4.1 Prompt for Generating a Fully Valid Bundle (Bundle A: Clean Application)
+### 4.1 Prompt for Generating Valid Identity Documents (Aadhaar Card & PAN Card)
 
-Copy and paste this prompt into an AI tool to generate a Python script that builds 3 authentic test PDFs using `reportlab`:
+Copy and paste this prompt into an AI tool to generate a Python script using `reportlab` or `fitz` (PyMuPDF) to create authentic test Aadhaar and PAN documents:
 
 ```text
-Please write a clean Python script using `reportlab` that generates three PDF documents for testing a financial verification system:
+Please write a Python script to generate authentic Indian identity documents for testing a financial verification system:
 
-1. Employee ID Card (`id_test.pdf`):
-   - Company: "Apex Global Technologies Pvt Ltd"
-   - Employee Name: "Aditya Verma"
-   - Employee ID: "EMP-APEX-9042"
-   - Designation: "Senior Systems Engineer"
-   - Issue Date: "01/01/2024", Valid Thru: "31/12/2026"
+1. Aadhaar Card (`aadhaar_test.pdf` - docType: 2):
+   - Header: "Government of India", "Unique Identification Authority of India (UIDAI)"
+   - Subtitle: "Enrollment No: 1234/56789/01234", "Mera Aadhaar, Meri Pehchan"
+   - Recipient Name: "Aarav Mehta"
+   - Address: "42 Palm Avenue, Bandra West, Mumbai 400050"
+   - Details:
+     * Name: "Aarav Mehta"
+     * Date of Birth: "15/08/1992"
+     * Gender: "Male"
+   - Aadhaar Number: "9999 9999 0019" (Note: Must be a valid Verhoeff checksum number)
+   - Footer: "VID: 9182 7364 5543 2109", "help@uidai.gov.in | www.uidai.gov.in"
 
-2. Salary Slip (`salary_test.pdf`):
+2. PAN Card (`pan_test.pdf` - docType: 3):
+   - Header: "INCOME TAX DEPARTMENT", "GOVT. OF INDIA"
+   - Card Title: "Permanent Account Number Card", "PAN Card"
+   - Permanent Account Number: "ABCPE1234F" (4th char 'P' for Individual, 5th char 'E')
+   - Details:
+     * Name: "Aarav Mehta"
+     * Father's Name: "Suresh Mehta"
+     * Date of Birth: "15/08/1992"
+   - Footer: "Signature" placeholder
+
+Formatting guidelines:
+- Clean Helvetica standard font.
+- Crisp vector layout with standard 595x842 (A4) or credit card proportions.
+```
+
+### 4.2 Prompt for Generating a Complete 4-Document Clean Bundle (Bundle A)
+
+Copy and paste this prompt into an AI tool to generate a Python script that builds all 4 documents in an authentic borrower bundle:
+
+```text
+Please write a clean Python script using `reportlab` or `pymupdf` that generates four documents for testing a blockchain loan verification bundle:
+
+1. Aadhaar Card (`aadhaar_test.pdf` - docType 2):
+   - Name: "Aarav Mehta", DOB: "15/08/1992", Aadhaar: "9999 9999 0019"
+
+2. PAN Card (`pan_test.pdf` - docType 3):
+   - Name: "Aarav Mehta", DOB: "15/08/1992", PAN: "ABCPE1234F"
+
+3. Salary Slip (`salary_test.pdf` - docType 0):
    - Company: "Apex Global Technologies Pvt Ltd"
-   - Employee Name: "Aditya Verma", Employee ID: "EMP-APEX-9042"
+   - Employee Name: "Aarav Mehta", Employee ID: "EMP-APEX-9042"
    - Pay Period: "October 2026", Issue Date: "31/10/2026"
-   - Earnings Table:
-     * Basic Salary: INR 28,000.00
-     * House Rent Allowance (HRA): INR 12,000.00
-     * Special Allowance: INR 8,500.00
-     * Gross Earnings: INR 48,500.00 (Must exactly equal sum of basic + hra + special allowance)
-   - Deductions Table:
-     * Provident Fund: INR 3,360.00
-     * Professional Tax: INR 200.00
-     * Income Tax (TDS): INR 1,500.00
-     * Total Deductions: INR 5,060.00 (Must exactly equal sum of deductions)
-   - Net Pay Summary:
-     * Net Salary: INR 43,440.00 (Must exactly equal Gross Earnings - Total Deductions)
-     * Disbursed via Bank Transfer to Account ending in 8912
+   - Basic Salary: INR 28,000.00, HRA: INR 12,000.00, Special Allowance: INR 8,500.00
+   - Gross Earnings: INR 48,500.00
+   - PF: INR 3,360.00, Prof Tax: INR 200.00, TDS: INR 1,500.00
+   - Total Deductions: INR 5,060.00
+   - Net Salary: INR 43,440.00 (Gross - Deductions)
+   - Bank Account: Ending in 8912
 
-3. Bank Account Statement (`statement_test.pdf`):
-   - Bank Name: "National Commercial Bank"
-   - Account Holder: "Aditya Verma"
-   - Account Number: "987654328912"
+4. Bank Account Statement (`statement_test.pdf` - docType 1):
+   - Bank: "National Commercial Bank"
+   - Account Holder: "Aarav Mehta", Account Number: "987654328912"
    - Statement Period: "01/10/2026 to 31/10/2026"
-   - Summary:
-     * Opening Balance: INR 15,200.00
-     * Total Deposits: INR 43,440.00
-     * Total Withdrawals: INR 18,500.00
-     * Closing Balance: INR 40,140.00 (Must exactly equal Opening + Deposits - Withdrawals)
+   - Opening Balance: INR 15,200.00
+   - Total Deposits: INR 43,440.00
+   - Total Withdrawals: INR 18,500.00
+   - Closing Balance: INR 40,140.00 (Opening + Deposits - Withdrawals)
    - Transactions list must include:
-     * Date: "31/10/2026", Description: "SALARY CREDIT - APEX GLOBAL TECHNOLOGIES", Credit: "43,440.00"
-
-Formatting requirements:
-- Use standard Helvetica fonts only.
-- Render clean borders, distinct table grids, and correct date formats (DD/MM/YYYY).
-- Ensure all numbers strictly adhere to the arithmetic formulas without rounding discrepancies.
+     Date: "31/10/2026", Description: "SALARY CREDIT - APEX GLOBAL TECHNOLOGIES", Credit: "43,440.00"
 ```
 
 ---

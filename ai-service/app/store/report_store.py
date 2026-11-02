@@ -86,6 +86,20 @@ class ReportStore:
                 return json.loads(row["report_json"])
         return None
 
+    def get_reports_by_doc_id(self, doc_id: str) -> List[Dict[str, Any]]:
+        with self._get_connection() as conn:
+            cur = conn.execute(
+                "SELECT report_json FROM explanation_reports WHERE doc_id = ? ORDER BY created_at DESC",
+                (doc_id,),
+            )
+            results = []
+            for row in cur.fetchall():
+                try:
+                    results.append({"report_data": json.loads(row["report_json"])})
+                except Exception:
+                    pass
+            return results
+
     def list_reports(self, limit: int = 50) -> List[Dict[str, Any]]:
         with self._get_connection() as conn:
             cur = conn.execute(

@@ -830,12 +830,13 @@ p.page-subtitle {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.45);
+  background: rgba(15, 23, 42, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
-  padding: 16px;
+  z-index: 1000;
+  padding: 24px 16px;
+  overflow-y: auto;
 }
 
 .modal-card {
@@ -843,36 +844,47 @@ p.page-subtitle {
   border: 1px solid var(--border-color);
   border-radius: 6px;
   width: 100%;
-  max-width: 500px;
-  box-shadow: var(--shadow-md);
+  max-width: 600px;
+  max-height: min(88vh, 840px);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
   overflow: hidden;
+  margin: auto;
 }
 
 .modal-card-header {
-  padding: 16px 20px;
+  padding: 14px 20px;
   border-bottom: 1px solid var(--border-color);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-shrink: 0;
+  background: #ffffff;
 }
 
 .modal-card-title {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--text-main);
+  letter-spacing: -0.01em;
 }
 
 .modal-card-body {
-  padding: 20px;
+  padding: 18px 20px;
+  overflow-y: auto;
+  flex: 1 1 auto;
+  overscroll-behavior: contain;
 }
 
 .modal-card-footer {
-  padding: 14px 20px;
+  padding: 12px 20px;
   border-top: 1px solid var(--border-color);
-  background: #f5f6f8;
+  background: #f8fafc;
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 /* ── Spinner ────────────────────────────────────────────────── */

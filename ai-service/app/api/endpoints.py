@@ -14,7 +14,9 @@ from app.core.bundle import verify_bundle
 from app.core.explain import generate_explanation_report
 from app.core.signing import sign_doc_attestation
 from app.models.result import VerificationResult, BundleResult
+from app.models.affordability import AffordabilityAnalysis
 from app.models.template import TemplateSchema
+from app.core.affordability import evaluate_affordability
 from app.store.report_store import report_store
 
 logger = logging.getLogger(__name__)
@@ -240,12 +242,15 @@ async def verify_document_bundle(
     docIds: str = Form(description="Comma-separated on-chain docIds"),
     docTypes: str = Form(description="Comma-separated docType integers matching files"),
     loanId: Optional[int] = Form(None),
+    loanAmount: Optional[float] = Form(None),
+    tenure: Optional[int] = Form(None),
+    interestRate: Optional[int] = Form(None),
     skip_chain_check: bool = Form(False),
 ):
     """
     Verifies a full document application bundle:
     Runs per-document verification pipeline and executes cross-document invariants
-    (name match, PAN match, salary credit reconciliation, advisory suggested action).
+    (name match, PAN match, salary credit reconciliation, AI affordability analysis, advisory suggested action).
     """
     id_list = [d.strip() for d in docIds.split(",") if d.strip()]
     type_list = [int(t.strip()) for t in docTypes.split(",") if t.strip()]
@@ -272,6 +277,53 @@ async def verify_document_bundle(
         )
         doc_results.append(res)
 
-    # Evaluate bundle-level invariants
-    bundle_res = verify_bundle(doc_results=doc_results, loan_id=loanId)
+    # Evaluate bundle-level invariants and affordability
+    bundle_res = verify_bundle(
+        doc_results=doc_results,
+        loan_id=loanId,
+        loan_amount_eth=loanAmount,
+        tenure_months=tenure,
+        interest_rate_bps=interestRate,
+    )
     return bundle_res
+
+
+@router.post("/analyze/affordability", response_model=AffordabilityAnalysis)
+async def analyze_loan_affordability(
+    docIds: Optional[str] = Form(None, description="Comma-separated docIds to lookup from verified report store"),
+    monthlyIncome: Optional[float] = Form(None, description="Direct monthly income in INR if known"),
+    existingObligations: Optional[float] = Form(None, description="Direct monthly obligations in INR if known"),
+    loanAmount: Optional[float] = Form(None, description="Proposed loan amount in ETH"),
+    tenure: Optional[int] = Form(None, description="Proposed loan tenure in months"),
+    interestRate: Optional[int] = Form(None, description="Annual interest rate in basis points (e.g. 850 = 8.5%)"),
+):
+    """
+    Performs AI-assisted loan affordability and debt-to-income (DTI) analysis.
+    Uses verified document facts from on-chain reports or provided financial figures.
+    Returns advisory safe EMI ceiling, projected DTI, and suggested counter-offer terms.
+    """
+    doc_results: List[VerificationResult] = []
+
+    if docIds:
+        ids = [i.strip() for i in docIds.split(",") if i.strip()]
+        for did in ids:
+            # Query report store by doc_id
+            reps = report_store.get_reports_by_doc_id(did)
+            if reps:
+                try:
+                    # Parse VerificationResult from saved report data
+                    rep_dict = reps[0].get("report_data", {})
+                    if rep_dict:
+                        doc_results.append(VerificationResult(**rep_dict))
+                except Exception as ex:
+                    logger.warning(f"Could not reconstruct VerificationResult for {did}: {ex}")
+
+    affordability = evaluate_affordability(
+        doc_results=doc_results if doc_results else None,
+        income_inr=monthlyIncome,
+        obligations_inr=existingObligations,
+        loan_amount_eth=loanAmount,
+        tenure_months=tenure,
+        interest_rate_bps=interestRate,
+    )
+    return affordability

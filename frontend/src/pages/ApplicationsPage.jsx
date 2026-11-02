@@ -3,7 +3,8 @@ import { useWeb3 } from "../context/Web3Context";
 import { useLoans } from "../hooks/useBlockchain";
 import { LOAN_STATUS_LABELS } from "../config/contracts";
 import AIBadge from "../components/AIBadge";
-import { verifyDocumentBundle } from "../services/aiService";
+import AIAffordabilityCard from "../components/AIAffordabilityCard";
+import { verifyDocumentBundle, analyzeAffordability } from "../services/aiService";
 import {
   Plus,
   RefreshCw,
@@ -67,6 +68,7 @@ export default function ApplicationsPage({ setPage }) {
   const [bundleResult, setBundleResult] = useState(null);
   const [bundleLoading, setBundleLoading] = useState(false);
   const [bundleErr, setBundleErr] = useState(null);
+  const [loanAffordability, setLoanAffordability] = useState(null);
 
   // Load document and AI attestation bundle details when selectedLoan changes
   useEffect(() => {
@@ -78,6 +80,7 @@ export default function ApplicationsPage({ setPage }) {
       setBundleResult(null);
       setBundleFiles([]);
       setBundleErr(null);
+      setLoanAffordability(null);
       return;
     }
 
@@ -88,6 +91,20 @@ export default function ApplicationsPage({ setPage }) {
         if (!active) return;
         const rawIds = Array.from(ids);
         setLoanDocIds(rawIds);
+
+        // Fetch AI affordability analysis for this loan application
+        analyzeAffordability({
+          docIds: rawIds,
+          loanAmount: parseFloat(selectedLoan.amount) || 0.5,
+          tenure: parseInt(selectedLoan.tenure) || 24,
+          interestRate: parseInt(selectedLoan.interestRate) || 850,
+        })
+          .then((aff) => {
+            if (active) setLoanAffordability(aff);
+          })
+          .catch((e) => {
+            console.warn("Affordability query error:", e);
+          });
 
         // Check strict policy
         try {
@@ -155,9 +172,15 @@ export default function ApplicationsPage({ setPage }) {
         docIds: loanDocIds.slice(0, bundleFiles.length),
         docTypes: types,
         loanId: selectedLoan?.id,
+        loanAmount: parseFloat(selectedLoan?.amount) || 0.5,
+        tenure: parseInt(selectedLoan?.tenure) || 24,
+        interestRate: parseInt(selectedLoan?.interestRate) || 850,
         skipChainCheck: false,
       });
       setBundleResult(res);
+      if (res?.affordability) {
+        setLoanAffordability(res.affordability);
+      }
     } catch (err) {
       setBundleErr(err.message || "Bundle verification failed");
     } finally {
@@ -459,72 +482,75 @@ export default function ApplicationsPage({ setPage }) {
                       )}
                     </div>
                   )}
-
-                  {/* Officer Cross-Document Consistency Audit (Only for multi-document applications) */}
-                  {(isOwner || isOfficer) && loanDocIds.length > 1 && (
-                    <div style={{ marginTop: "12px", paddingTop: "10px", borderTop: "1px solid var(--border-color)" }}>
-                      <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-main)", marginBottom: "4px" }}>
-                        Officer Cross-Document Consistency Audit (Optional)
-                      </div>
-                      <div style={{ fontSize: "11.5px", color: "#6b7280", marginBottom: "8px" }}>
-                        Select the {loanDocIds.length} original files to reconcile names, employers, and salary figures across documents.
-                      </div>
-                      {!bundleResult ? (
-                        <div>
-                          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                            <input
-                              type="file"
-                              multiple
-                              onChange={(e) => setBundleFiles(Array.from(e.target.files || []))}
-                              className="form-control"
-                              style={{ fontSize: "12px", padding: "4px 8px" }}
-                            />
-                            <button
-                              type="button"
-                              className="btn btn-outline-primary btn-sm"
-                              onClick={handleBundleVerify}
-                              disabled={bundleLoading || bundleFiles.length === 0}
-                              style={{ flexShrink: 0 }}
-                            >
-                              {bundleLoading ? "Analyzing Bundle…" : "Run Bundle AI Check"}
-                            </button>
-                          </div>
-                          {bundleErr && (
-                            <div style={{ color: "#dc2626", fontSize: "11.5px", marginTop: "4px" }}>
-                              {bundleErr}
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div style={{ display: "flex", flexDirection: "column", gap: "8px", background: "#ffffff", padding: "10px", borderRadius: "6px", border: "1px solid var(--border-color)" }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <span style={{ fontWeight: 700, fontSize: "12.5px" }}>
-                              Suggested Officer Action: <span style={{ color: bundleResult.verdict === 0 ? "#15803d" : bundleResult.verdict === 1 ? "#b45309" : "#b91c1c" }}>{bundleResult.suggested_action}</span>
-                            </span>
-                            <AIBadge verdict={bundleResult.verdict} confidenceBps={bundleResult.confidence_bps} size="sm" />
-                          </div>
-                          <div style={{ fontSize: "12px", color: "#4b5563" }}>
-                            {bundleResult.summary}
-                          </div>
-                          {bundleResult.bundle_checks && bundleResult.bundle_checks.length > 0 && (
-                            <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginTop: "4px" }}>
-                              {bundleResult.bundle_checks.map((chk, i) => (
-                                <div key={i} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11.5px" }}>
-                                  {chk.passed ? (
-                                    <CheckCircle2 size={13} color="#16a34a" />
-                                  ) : (
-                                    <XCircle size={13} color="#dc2626" />
-                                  )}
-                                  <span>{chk.description}</span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </div>
+
+                {/* AI Loan Affordability Analysis Card */}
+                <AIAffordabilityCard affordability={bundleResult?.affordability || loanAffordability} />
+
+                {/* Officer Cross-Document Consistency Audit (Only for multi-document applications) */}
+                {(isOwner || isOfficer) && loanDocIds.length > 1 && (
+                  <div style={{ marginTop: "12px", padding: "12px", background: "#f8fafc", border: "1px solid var(--border-color)", borderRadius: "8px" }}>
+                    <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-main)", marginBottom: "4px" }}>
+                      Officer Cross-Document Consistency Audit (Optional)
+                    </div>
+                    <div style={{ fontSize: "11.5px", color: "#6b7280", marginBottom: "8px" }}>
+                      Select the {loanDocIds.length} original files to reconcile names, employers, and salary figures across documents.
+                    </div>
+                    {!bundleResult ? (
+                      <div>
+                        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                          <input
+                            type="file"
+                            multiple
+                            onChange={(e) => setBundleFiles(Array.from(e.target.files || []))}
+                            className="form-control"
+                            style={{ fontSize: "12px", padding: "4px 8px" }}
+                          />
+                          <button
+                            type="button"
+                            className="btn btn-outline-primary btn-sm"
+                            onClick={handleBundleVerify}
+                            disabled={bundleLoading || bundleFiles.length === 0}
+                            style={{ flexShrink: 0 }}
+                          >
+                            {bundleLoading ? "Analyzing Bundle…" : "Run Bundle AI Check"}
+                          </button>
+                        </div>
+                        {bundleErr && (
+                          <div style={{ color: "#dc2626", fontSize: "11.5px", marginTop: "4px" }}>
+                            {bundleErr}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "8px", background: "#ffffff", padding: "10px", borderRadius: "6px", border: "1px solid var(--border-color)" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <span style={{ fontWeight: 700, fontSize: "12.5px" }}>
+                            Suggested Officer Action: <span style={{ color: bundleResult.verdict === 0 ? "#15803d" : bundleResult.verdict === 1 ? "#b45309" : "#b91c1c" }}>{bundleResult.suggested_action}</span>
+                          </span>
+                          <AIBadge verdict={bundleResult.verdict} confidenceBps={bundleResult.confidence_bps} size="sm" />
+                        </div>
+                        <div style={{ fontSize: "12px", color: "#4b5563" }}>
+                          {bundleResult.summary}
+                        </div>
+                        {bundleResult.bundle_checks && bundleResult.bundle_checks.length > 0 && (
+                          <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginTop: "4px" }}>
+                            {bundleResult.bundle_checks.map((chk, i) => (
+                              <div key={i} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11.5px" }}>
+                                {chk.passed ? (
+                                  <CheckCircle2 size={13} color="#16a34a" />
+                                ) : (
+                                  <XCircle size={13} color="#dc2626" />
+                                )}
+                                <span>{chk.description}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {selectedLoan.rejectionReason && (
                   <div className="alert-box error" style={{ marginTop: "8px" }}>

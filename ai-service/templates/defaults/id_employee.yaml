@@ -1,6 +1,6 @@
 id: id_employee.default
 version: 1.0.0
-docType: IDCard
+docType: Other
 extends: null
 anchors:
   - ["employee id card", "identity card", "employee identification card", "sample employee id card"]

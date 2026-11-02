@@ -102,7 +102,43 @@ def test_verify_statement456_authentic():
     assert result["extracted_fields"]["closing_balance"] == "₹45,900.00"
 
 
-def test_verify_id123_authentic():
+def test_verify_aadhaar_authentic():
+    pdf_path = DUMMY_DIR / "aadhaar_test.pdf"
+    assert pdf_path.exists()
+    file_bytes = pdf_path.read_bytes()
+    doc_hash = compute_keccak256(file_bytes)
+
+    response = client.post(
+        "/v1/verify/document",
+        files={"file": ("aadhaar_test.pdf", file_bytes, "application/pdf")},
+        data={"docId": doc_hash, "docType": 2, "skip_chain_check": True},  # 2 = AadhaarCard
+    )
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result["verdict"] == 0  # Approved
+    assert result["extracted_fields"]["full_name"] == "AARAV MEHTA"
+    assert "0019" in result["extracted_fields"]["aadhaar_number"]
+
+
+def test_verify_pan_authentic():
+    pdf_path = DUMMY_DIR / "pan_test.pdf"
+    assert pdf_path.exists()
+    file_bytes = pdf_path.read_bytes()
+    doc_hash = compute_keccak256(file_bytes)
+
+    response = client.post(
+        "/v1/verify/document",
+        files={"file": ("pan_test.pdf", file_bytes, "application/pdf")},
+        data={"docId": doc_hash, "docType": 3, "skip_chain_check": True},  # 3 = PANCard
+    )
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result["verdict"] == 0  # Approved
+    assert result["extracted_fields"]["full_name"] == "AARAV MEHTA"
+    assert "ABCPE" in result["extracted_fields"]["pan"]
+
+
+def test_verify_employee_id_as_other():
     pdf_path = DUMMY_DIR / "id123.pdf"
     assert pdf_path.exists()
     file_bytes = pdf_path.read_bytes()
@@ -111,31 +147,12 @@ def test_verify_id123_authentic():
     response = client.post(
         "/v1/verify/document",
         files={"file": ("id123.pdf", file_bytes, "application/pdf")},
-        data={"docId": doc_hash, "docType": 2, "skip_chain_check": True},
+        data={"docId": doc_hash, "docType": 6, "skip_chain_check": True},  # 6 = Other
     )
     assert response.status_code == 200, response.text
     result = response.json()
     assert result["verdict"] == 0  # Approved
     assert result["extracted_fields"]["full_name"] == "AARAV MEHTA"
-    assert result["extracted_fields"]["employee_id"] == "EMP-DEMO-001"
-
-
-def test_verify_id456_authentic():
-    pdf_path = DUMMY_DIR / "id456.pdf"
-    assert pdf_path.exists()
-    file_bytes = pdf_path.read_bytes()
-    doc_hash = compute_keccak256(file_bytes)
-
-    response = client.post(
-        "/v1/verify/document",
-        files={"file": ("id456.pdf", file_bytes, "application/pdf")},
-        data={"docId": doc_hash, "docType": 2, "skip_chain_check": True},
-    )
-    assert response.status_code == 200, response.text
-    result = response.json()
-    assert result["verdict"] == 0  # Approved
-    assert result["extracted_fields"]["full_name"] == "PRIYA SHARMA"
-    assert result["extracted_fields"]["employee_id"] == "EMP-DEMO-002"
 
 
 def test_doctype_mismatch_fails():

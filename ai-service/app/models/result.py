@@ -2,6 +2,7 @@ from enum import IntEnum
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 from app.models.facts import ForensicSignal, RuleEvaluation
+from app.models.affordability import AffordabilityAnalysis
 
 
 class VerdictEnum(IntEnum):
@@ -52,3 +53,4 @@ class BundleResult(BaseModel):
     doc_results: List[VerificationResult] = Field(default_factory=list)
     bundle_checks: List[RuleEvaluation] = Field(default_factory=list)
     summary: str
+    affordability: Optional[AffordabilityAnalysis] = None

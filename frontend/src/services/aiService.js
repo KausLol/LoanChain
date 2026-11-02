@@ -85,6 +85,9 @@ export async function verifyDocumentBundle({
   docIds,
   docTypes,
   loanId = null,
+  loanAmount = null,
+  tenure = null,
+  interestRate = null,
   skipChainCheck = false,
 }) {
   const formData = new FormData();
@@ -93,6 +96,15 @@ export async function verifyDocumentBundle({
   formData.append("docTypes", docTypes.map(String).join(","));
   if (loanId != null) {
     formData.append("loanId", String(loanId));
+  }
+  if (loanAmount != null) {
+    formData.append("loanAmount", String(loanAmount));
+  }
+  if (tenure != null) {
+    formData.append("tenure", String(tenure));
+  }
+  if (interestRate != null) {
+    formData.append("interestRate", String(interestRate));
   }
   formData.append("skip_chain_check", String(skipChainCheck));
 
@@ -111,5 +123,40 @@ export async function verifyDocumentBundle({
     throw err;
   }
 
+  return data;
+}
+
+/**
+ * Performs AI-assisted loan affordability, DTI, and repayment capacity analysis.
+ * Advisory recommendation only: Human officer remains authoritative.
+ */
+export async function analyzeAffordability({
+  docIds = null,
+  monthlyIncome = null,
+  existingObligations = null,
+  loanAmount = null,
+  tenure = null,
+  interestRate = null,
+}) {
+  const formData = new FormData();
+  if (docIds && docIds.length > 0) {
+    formData.append("docIds", Array.isArray(docIds) ? docIds.join(",") : String(docIds));
+  }
+  if (monthlyIncome != null) formData.append("monthlyIncome", String(monthlyIncome));
+  if (existingObligations != null) formData.append("existingObligations", String(existingObligations));
+  if (loanAmount != null) formData.append("loanAmount", String(loanAmount));
+  if (tenure != null) formData.append("tenure", String(tenure));
+  if (interestRate != null) formData.append("interestRate", String(interestRate));
+
+  const resp = await fetch(`${AI_SERVICE_URL}/v1/analyze/affordability`, {
+    method: "POST",
+    body: formData,
+  });
+
+  const data = await resp.json();
+  if (!resp.ok) {
+    const errorMsg = data?.detail?.error?.message || data?.detail || `HTTP ${resp.status} error`;
+    throw new Error(errorMsg);
+  }
   return data;
 }
