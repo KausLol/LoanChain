@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Web3Provider } from "./context/Web3Context";
+import { useWeb3 } from "./context/Web3Context";
 import Header from "./components/Header";
 import Sidebar from "./components/Sidebar";
 import DashboardPage from "./pages/DashboardPage";
@@ -7,6 +8,7 @@ import LoanApplicationPage from "./pages/LoanApplicationPage";
 import DocumentsPage from "./pages/DocumentsPage";
 import ApplicationsPage from "./pages/ApplicationsPage";
 import AuditTrailPage from "./pages/AuditTrailPage";
+import LandingPage from "./pages/LandingPage";
 import "./index.css";
 
 const PAGES = {
@@ -64,7 +66,23 @@ function Footer() {
 
 function AppContent() {
   const [page, setPage] = useState("dashboard");
+  const [showLanding, setShowLanding] = useState(true);
+  const { account, connectWallet, connecting } = useWeb3();
   const CurrentPage = PAGES[page] || DashboardPage;
+
+  useEffect(() => {
+    if (account) setShowLanding(false);
+  }, [account]);
+
+  if (showLanding) {
+    return (
+      <LandingPage
+        onEnter={() => setShowLanding(false)}
+        connectWallet={connectWallet}
+        connecting={connecting}
+      />
+    );
+  }
 
   return (
     <div className="app-container">

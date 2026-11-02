@@ -220,7 +220,7 @@ export default function AuditTrailPage() {
               <p className="empty-placeholder-desc">No state transitions recorded for Loan #{selectedLoan}.</p>
             </div>
           ) : (
-            <div className="activity-timeline" style={{ paddingLeft: "24px", marginTop: "16px" }}>
+            <div className="activity-timeline" style={{ marginTop: "16px" }}>
               {loanAudit.map((entry, idx) => (
                 <div key={idx} className="activity-item" style={{ padding: "14px 0" }}>
                   <div className="activity-dot green" />

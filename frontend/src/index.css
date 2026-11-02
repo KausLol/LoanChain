@@ -1,32 +1,32 @@
-/* ── LoanChain Clean Human-Made Design System ── */
+/* ── LoanChain Design System ── */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 :root {
-  /* Core brand colors - solid slate & blue */
-  --primary: #2563eb;
-  --primary-hover: #1d4ed8;
-  --primary-light: #eff6ff;
-  --primary-border: #bfdbfe;
+  /* Core brand colors — dark navy */
+  --primary: #1e3a5f;
+  --primary-hover: #162d4a;
+  --primary-light: #f0f4f8;
+  --primary-border: #c8d8e8;
 
   /* Neutrals */
-  --bg-app: #f8fafc;
+  --bg-app: #f5f6f8;
   --bg-sidebar: #ffffff;
   --bg-header: #ffffff;
   --bg-card: #ffffff;
-  --bg-card-subtle: #f8fafc;
+  --bg-card-subtle: #f5f6f8;
   --bg-input: #ffffff;
 
   /* Borders */
   --border-subtle: #f1f5f9;
-  --border-color: #e2e8f0;
-  --border-strong: #cbd5e1;
+  --border-color: #e0e4ea;
+  --border-strong: #c8cdd6;
 
   /* Typography */
-  --text-main: #0f172a;
-  --text-secondary: #475569;
-  --text-muted: #94a3b8;
-  --text-link: #2563eb;
+  --text-main: #1a202c;
+  --text-secondary: #4a5568;
+  --text-muted: #9aa3b0;
+  --text-link: #1e3a5f;
 
   /* Status Colors (Soft solid badges) */
   --status-review-bg: #fef3c7;
@@ -62,14 +62,14 @@
   --status-needsdocs-border: #fed7aa;
 
   /* Shadows */
-  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.06), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.08);
 
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 8px;
 }
 
 *, *::before, *::after {
@@ -99,7 +99,7 @@ body {
 
 /* ── Top Header ─────────────────────────────────────────────── */
 .top-header {
-  height: 64px;
+  height: 52px;
   background: var(--bg-header);
   border-bottom: 1px solid var(--border-color);
   display: flex;
@@ -109,6 +109,7 @@ body {
   position: sticky;
   top: 0;
   z-index: 50;
+  box-shadow: var(--shadow-xs);
 }
 
 .brand-section {
@@ -144,8 +145,8 @@ body {
   background: #ffffff;
   border: 1px solid var(--border-color);
   padding: 6px 14px;
-  border-radius: 8px;
-  font-size: 13px;
+  border-radius: 4px;
+  font-size: 12.5px;
   font-weight: 500;
   color: var(--text-main);
 }
@@ -164,8 +165,8 @@ body {
   background: #ffffff;
   border: 1px solid var(--border-color);
   padding: 5px 12px;
-  border-radius: 8px;
-  font-size: 13px;
+  border-radius: 4px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--text-main);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
@@ -179,14 +180,14 @@ body {
 
 /* ── Sidebar ────────────────────────────────────────────────── */
 .sidebar {
-  width: 220px;
+  width: 200px;
   background: var(--bg-sidebar);
   border-right: 1px solid var(--border-color);
   padding: 16px 8px;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
-  min-height: calc(100vh - 64px);
+  min-height: calc(100vh - 52px);
 }
 
 .sidebar-nav {
@@ -200,8 +201,8 @@ body {
   align-items: center;
   gap: 12px;
   padding: 9px 14px;
-  border-radius: var(--radius-md);
-  font-size: 13.5px;
+  border-radius: 4px;
+  font-size: 13px;
   font-weight: 500;
   color: #4b5563;
   text-decoration: none;
@@ -210,7 +211,7 @@ body {
   width: 100%;
   text-align: left;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background-color 0.12s, color 0.12s;
 }
 
 .nav-item:hover {
@@ -219,7 +220,7 @@ body {
 }
 
 .nav-item.active {
-  background: #eff6ff;
+  background: #eef2f7;
   color: var(--primary);
   font-weight: 600;
 }
@@ -239,10 +240,10 @@ body {
 
 /* ── Typography & Headings ──────────────────────────────────── */
 h1.page-title {
-  font-size: 26px;
-  font-weight: 800;
+  font-size: 19px;
+  font-weight: 700;
   color: var(--text-main);
-  letter-spacing: -0.025em;
+  letter-spacing: -0.01em;
   margin-bottom: 4px;
   line-height: 1.25;
 }
@@ -269,7 +270,6 @@ p.page-subtitle {
   display: flex;
   align-items: center;
   gap: 14px;
-  box-shadow: var(--shadow-xs);
 }
 
 .wallet-widget-info {
@@ -289,17 +289,16 @@ p.page-subtitle {
   font-family: ui-monospace, SFMono-Regular, monospace;
 }
 
-/* ── Cards & Headings (Fixed Font Inconsistencies & Overlaps) ── */
+/* ── Cards ──────────────────────────────────────────────────── */
 .card {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  padding: 20px;
-  box-shadow: var(--shadow-xs);
+  border-radius: 6px;
+  padding: 16px;
 }
 
 .card-title {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--text-main);
   margin-bottom: 4px;
@@ -337,16 +336,15 @@ p.page-subtitle {
   background: #ffffff;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
-  padding: 18px 20px;
+  padding: 14px 16px;
   display: flex;
   align-items: center;
-  gap: 16px;
-  box-shadow: var(--shadow-xs);
+  gap: 12px;
 }
 
 .metric-icon-box {
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   border-radius: var(--radius-md);
   display: flex;
   align-items: center;
@@ -355,31 +353,31 @@ p.page-subtitle {
 }
 
 .metric-icon-box.blue {
-  background: #eff6ff;
-  border: 1px solid #dbeafe;
-  color: #2563eb;
+  background: #eef2f8;
+  border: 1px solid #dbe4f0;
+  color: #1e3a5f;
 }
 
 .metric-icon-box.cyan {
-  background: #f0f9ff;
-  border: 1px solid #e0f2fe;
-  color: #0284c7;
+  background: #eef8ff;
+  border: 1px solid #d0eeff;
+  color: #0369a1;
 }
 
 .metric-icon-box.green {
-  background: #f0fdf4;
-  border: 1px solid #dcfce7;
-  color: #16a34a;
+  background: #eefaf2;
+  border: 1px solid #d1f0dc;
+  color: #166534;
 }
 
 .metric-icon-box.rose {
-  background: #fff1f2;
+  background: #fff4f4;
   border: 1px solid #ffe4e6;
-  color: #e11d48;
+  color: #be123c;
 }
 
 .metric-value {
-  font-size: 26px;
+  font-size: 22px;
   font-weight: 800;
   color: var(--text-main);
   line-height: 1.1;
@@ -403,7 +401,7 @@ p.page-subtitle {
 /* ── Dropzone (Upload Document) ─────────────────────────────── */
 .clean-dropzone {
   border: 1.5px dashed var(--border-strong);
-  border-radius: var(--radius-lg);
+  border-radius: 6px;
   background: #ffffff;
   padding: 28px 20px;
   text-align: center;
@@ -412,7 +410,7 @@ p.page-subtitle {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: border-color 0.15s, background-color 0.15s;
+  transition: border-color 0.15s;
 }
 
 .clean-dropzone:hover, .clean-dropzone.dragging {
@@ -448,15 +446,15 @@ p.page-subtitle {
   display: flex;
   flex-direction: column;
   position: relative;
-  padding-left: 20px;
+  padding-left: 24px;
 }
 
 .activity-timeline::before {
   content: "";
   position: absolute;
-  top: 10px;
-  bottom: 10px;
-  left: 6px;
+  top: 14px;
+  bottom: 16px;
+  left: 8px;
   width: 2px;
   background: var(--border-color);
 }
@@ -478,6 +476,7 @@ p.page-subtitle {
   border-radius: 50%;
   background: #ffffff;
   border: 2px solid #94a3b8;
+  box-sizing: border-box;
 }
 
 .activity-dot.green {
@@ -486,8 +485,8 @@ p.page-subtitle {
 }
 
 .activity-dot.blue {
-  border-color: #2563eb;
-  background: #2563eb;
+  border-color: #1e3a5f;
+  background: #1e3a5f;
 }
 
 .activity-dot.gray {
@@ -541,19 +540,19 @@ p.page-subtitle {
   text-decoration: underline;
 }
 
-/* ── Buttons (Pure solid colors, no gradients) ───────────────── */
+/* ── Buttons ─────────────────────────────────────────────────── */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
   padding: 7px 14px;
-  border-radius: var(--radius-sm);
+  border-radius: 4px;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   border: 1px solid transparent;
-  transition: all 0.15s ease;
+  transition: background-color 0.12s, border-color 0.12s;
   text-decoration: none;
   line-height: 1.25;
 }
@@ -589,11 +588,11 @@ p.page-subtitle {
 .btn-outline-primary {
   background-color: #ffffff;
   color: var(--primary);
-  border-color: #bfdbfe;
+  border-color: #b0c4d8;
 }
 
 .btn-outline-primary:hover:not(:disabled) {
-  background-color: #eff6ff;
+  background-color: var(--primary-light);
   border-color: var(--primary);
 }
 
@@ -622,7 +621,7 @@ p.page-subtitle {
 .table-container {
   overflow-x: auto;
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
+  border-radius: 4px;
   background: #ffffff;
 }
 
@@ -658,13 +657,13 @@ p.page-subtitle {
   background-color: #fafbfd;
 }
 
-/* ── Clean Status Badges (Pills) ────────────────────────────── */
+/* ── Status Badges ───────────────────────────────────────────── */
 .status-badge {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 3px 10px;
-  border-radius: 9999px;
+  padding: 2px 7px;
+  border-radius: 3px;
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
@@ -748,13 +747,13 @@ p.page-subtitle {
   color: var(--text-main);
   outline: none;
   font-family: inherit;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: border-color 0.15s;
   width: 100%;
 }
 
 .form-control:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+  box-shadow: 0 0 0 2px rgba(30, 58, 95, 0.12);
 }
 
 .form-control::placeholder {
@@ -778,7 +777,7 @@ p.page-subtitle {
   align-items: flex-start;
   gap: 12px;
   padding: 12px 16px;
-  border-radius: var(--radius-md);
+  border-radius: 4px;
   font-size: 13px;
   margin-bottom: 16px;
 }
@@ -815,7 +814,7 @@ p.page-subtitle {
   background: #f1f5f9;
   border: 1px solid #e2e8f0;
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: 3px;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -842,9 +841,9 @@ p.page-subtitle {
 .modal-card {
   background: #ffffff;
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-xl);
+  border-radius: 6px;
   width: 100%;
-  max-width: 520px;
+  max-width: 500px;
   box-shadow: var(--shadow-md);
   overflow: hidden;
 }
@@ -870,7 +869,7 @@ p.page-subtitle {
 .modal-card-footer {
   padding: 14px 20px;
   border-top: 1px solid var(--border-color);
-  background: #f8fafc;
+  background: #f5f6f8;
   display: flex;
   justify-content: flex-end;
   gap: 8px;

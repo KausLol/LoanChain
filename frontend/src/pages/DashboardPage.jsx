@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useWeb3 } from "../context/Web3Context";
 import { useLoans, useDocuments } from "../hooks/useBlockchain";
 import { LOAN_STATUS_LABELS, DOC_TYPE_LABELS } from "../config/contracts";
-import { MetaMaskFox } from "../components/Icons";
 import {
   FileText,
   FileSpreadsheet,
@@ -183,36 +182,18 @@ export default function DashboardPage({ setPage }) {
 
   return (
     <div>
-      {/* ── Top Welcome & Wallet Widget ── */}
-      <div className="welcome-header">
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "20px" }}>
         <div>
-          <h1 className="page-title">Welcome back</h1>
-          <p className="page-subtitle">
-            Manage your loan applications and verified documents on the blockchain.
-          </p>
+          <h1 className="page-title">Dashboard</h1>
+          <p className="page-subtitle">Your loan applications and verified documents on Ethereum Sepolia.</p>
         </div>
-
-        {/* Wallet Connected Box */}
-        <div className="wallet-connected-widget">
-          <MetaMaskFox size={36} />
-          <div className="wallet-widget-info">
-            <span className="wallet-widget-label">
-              {account ? "Wallet Connected" : "Wallet Not Connected"}
-            </span>
-            <span className="wallet-widget-address">
-              {account ? shortAddr(account) : "Connect Sepolia"}
-            </span>
-          </div>
-          {account ? (
-            <button className="btn btn-outline btn-sm" onClick={disconnect}>
-              Disconnect
-            </button>
-          ) : (
-            <button className="btn btn-primary btn-sm" onClick={connectWallet} disabled={connecting}>
-              {connecting ? "Connecting…" : "Connect"}
-            </button>
-          )}
-        </div>
+        <button
+          className="btn btn-outline btn-sm"
+          onClick={refreshData}
+          style={{ marginTop: "4px", flexShrink: 0 }}
+        >
+          Refresh
+        </button>
       </div>
 
       {/* ── 4 Metric Cards (Real Values, 0 for new user) ── */}
