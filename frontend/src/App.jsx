@@ -33,8 +33,8 @@ function Footer() {
         color: "#6b7280",
       }}
     >
-      <div>LoanChain — Blockchain Loan Verification Platform (Sepolia Testnet)</div>
-      <div style={{ display: "flex", gap: "16px" }}>
+      <div>LoanChain · Blockchain Loan Verification Platform (Sepolia Testnet)</div>
+      <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
         <a
           href="https://sepolia.etherscan.io"
           target="_blank"
@@ -43,14 +43,16 @@ function Footer() {
         >
           Sepolia Etherscan
         </a>
+        <span style={{ color: "#cbd5e1" }}>|</span>
         <a
-          href="https://sepoliafaucet.com"
+          href="https://cloud.google.com/application/web3/faucet/ethereum/sepolia"
           target="_blank"
           rel="noreferrer"
           style={{ color: "#6b7280", textDecoration: "none" }}
         >
           Get Sepolia ETH
         </a>
+        <span style={{ color: "#cbd5e1" }}>|</span>
         <a
           href="https://remix.ethereum.org"
           target="_blank"
