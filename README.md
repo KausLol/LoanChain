@@ -7,7 +7,7 @@ Built on Ethereum Sepolia · MetaMask · Solidity · React + Ethers.js v6 · Fas
 
 ## System Overview
 
-LoanChain pairs a decentralized, tamper-evident blockchain layer with an off-chain explainable AI document verification engine:
+LoanChain pairs a decentralized, tamper-evident blockchain layer with an off-chain explainable AI document verification engine and public IPFS storage:
 1. **Phase 1: Blockchain Infrastructure (Sepolia)**:
    - Client-side in-browser `keccak256` hashing and Merkle bundle generation.
    - Strict state machine (`LoanApplication.sol`) and immutable on-chain audit trails.
@@ -19,6 +19,15 @@ LoanChain pairs a decentralized, tamper-evident blockchain layer with an off-cha
    - Forensic signal detection (editing software metadata, font inconsistencies, incremental updates, overlay whiteouts, ELA).
    - Bayesian risk network (`pgmpy`) computing fraud probability and advisory verdicts (`Approved`, `Borderline`, `Rejected`).
    - Cryptographic EIP-712 typed-data signing anchored on-chain via `AIAttestation.sol`.
+3. **Phase 2.5: AI-Assisted Loan Affordability & Repayment Capacity Engine**:
+   - Real-time evaluation of borrower net monthly income and existing debt obligations.
+   - Conservative to ceiling (40%–50% FOIR) Safe EMI range calculations and projected Debt-to-Income (DTI) modeling.
+   - Dynamic counter-offer advisory suggesting affordable principal ceilings ($P_{\text{max}}$) and extended loan tenures ($n_{\text{adj}}$ up to 84 months).
+   - Evaluated in Step 3 (Review & Submit) strictly on the borrower's selected documents.
+4. **Public Pinata IPFS Storage & Officer Manual Review Layer**:
+   - Off-chain decentralized storage of document files via Public Pinata IPFS.
+   - Automated background pinning upon registration; only the CID is anchored on-chain.
+   - For non-AI-verified documents, officers are alerted with `Manual Review Required` and inspect original files via one-click **View on IPFS** gateway links before approving.
 
 For full specifications and document generation prompts, see [`AI_VERIFICATION_GUIDE.md`](AI_VERIFICATION_GUIDE.md).
 
@@ -30,12 +39,12 @@ For full specifications and document generation prompts, see [`AI_VERIFICATION_G
 loanchain_new/
 ├── ai-service/             ← Phase 2: Classical Explainable AI Verification Service
 │   ├── app/
-│   │   ├── api/            ← FastAPI endpoints (/verify/document, /verify/bundle, /report, /templates)
-│   │   ├── core/           ← Intake, chain client, extract, rules, forensics, scoring, signing
-│   │   ├── models/         ← Pydantic schemas (facts, template, result)
+│   │   ├── api/            ← FastAPI endpoints (/verify/document, /verify/bundle, /report, /templates, /ipfs/upload)
+│   │   ├── core/           ← Intake, chain client, extract, rules, forensics, scoring, signing, affordability
+│   │   ├── models/         ← Pydantic schemas (facts, template, result, affordability)
 │   │   └── store/          ← SQLite report persistence (keyed by explanationHash)
 │   ├── templates/          ← Versioned declarative YAML validation templates
-│   ├── tests/              ← 39 automated pytest integration and unit tests
+│   ├── tests/              ← 43 automated pytest integration and unit tests
 │   ├── .env.example
 │   └── requirements.txt
 │
@@ -49,18 +58,18 @@ loanchain_new/
 │
 ├── frontend/               ← React 19 + Vite + Ethers.js v6 frontend
 │   ├── src/
-│   │   ├── components/     ← AIBadge, AIVerificationPanel, Header, Sidebar, Icons
-│   │   ├── config/         ← ABIs, contract addresses, enum labels
+│   │   ├── components/     ← AIBadge, AIAffordabilityCard, AIVerificationPanel, Header, Sidebar
+│   │   ├── config/         ← ABIs, contract addresses, enum labels (including Aadhaar & PAN)
 │   │   ├── context/        ← Web3Context (MetaMask provider & contracts)
 │   │   ├── hooks/          ← useAIVerification, useBlockchain
-│   │   ├── services/       ← aiService (FastAPI client)
-│   │   ├── pages/          ← Dashboard, Documents, LoanApplication, Applications, AuditTrail
-│   │   └── index.css       ← Clean fintech design system (slate neutrals, royal blue)
+│   │   ├── services/       ← aiService (FastAPI client), pinataService (Public Pinata IPFS)
+│   │   ├── pages/          ← LandingPage, Dashboard, Documents, LoanApplication, Applications, AuditTrail
+│   │   └── index.css       ← Clean fintech design system (slate neutrals, royal blue, custom scrollbars)
 │   ├── .env.example
 │   └── package.json
 │
 ├── dummy/                  ← Sample real-world test PDFs (Aarav Mehta & Priya Sharma bundles)
-├── AI_VERIFICATION_GUIDE.md ← Comprehensive AI verification manual & generation guide
+├── AI_VERIFICATION_GUIDE.md ← Comprehensive AI verification manual, generation guide & IPFS workflow
 └── PROJECT_INFO.md         ← Full architectural and contract documentation
 ```
 
@@ -91,7 +100,7 @@ uv venv --python 3.11
 # Install pinned dependencies
 uv pip install -r requirements.txt
 
-# Run the test suite (39 tests)
+# Run the test suite (43 tests passing)
 pytest
 
 # Launch FastAPI service on port 8000
@@ -108,6 +117,10 @@ npm install
 
 # Configure environment in frontend/.env
 cp .env.example .env
+
+# (Optional: Add your free Pinata token for live IPFS pinning)
+# VITE_PINATA_JWT=your_pinata_jwt_here
+# VITE_PINATA_GATEWAY=https://gateway.pinata.cloud
 
 # Start Vite development server
 npm run dev

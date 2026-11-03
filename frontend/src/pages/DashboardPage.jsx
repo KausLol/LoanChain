@@ -3,6 +3,11 @@ import { useWeb3 } from "../context/Web3Context";
 import { useLoans, useDocuments } from "../hooks/useBlockchain";
 import { LOAN_STATUS_LABELS, DOC_TYPE_LABELS } from "../config/contracts";
 import {
+  isPinataConfigured,
+  uploadFileToPinata,
+  getIpfsGatewayUrl,
+} from "../services/pinataService";
+import {
   FileText,
   FileSpreadsheet,
   ShieldCheck,
@@ -97,7 +102,7 @@ export default function DashboardPage({ setPage }) {
       try {
         const total = await contracts.documentRegistry.getAuditLogLength();
         const logs = [];
-        const n = Math.min(Number(total), 6);
+        const n = Math.min(Number(total), 25);
         for (let i = Number(total) - 1; i >= Math.max(0, Number(total) - n); i--) {
           const entry = await contracts.documentRegistry.getAuditEntry(i);
           logs.push({
@@ -139,14 +144,25 @@ export default function DashboardPage({ setPage }) {
     setUploading(true);
     setUploadErr(null);
     try {
-      const simulatedCid = `ipfs://Qm${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`;
+      let cidToUse = `ipfs://Qm${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`;
+      if (isPinataConfigured()) {
+        try {
+          const pinRes = await uploadFileToPinata(uploadFile, {
+            docType: parseInt(uploadDocType),
+            fileName: uploadFile.name,
+          });
+          cidToUse = pinRes.ipfsUri;
+        } catch (pinErr) {
+          console.warn("Pinata upload failed in dashboard, falling back to simulated CID:", pinErr);
+        }
+      }
       const result = await uploadDocument({
         file: uploadFile,
         docType: parseInt(uploadDocType),
-        ipfsCid: simulatedCid,
+        ipfsCid: cidToUse,
         allDocHashes: myDocs.map((d) => d.docHash),
       });
-      setUploadSuccess(result);
+      setUploadSuccess({ ...result, ipfsCid: cidToUse });
       setUploadFile(null);
       await refreshData();
     } catch (err) {
@@ -345,8 +361,22 @@ export default function DashboardPage({ setPage }) {
               <CheckCircle2 size={18} style={{ flexShrink: 0, marginTop: "1px" }} />
               <div>
                 <div style={{ fontWeight: 600 }}>Document Registered On-Chain</div>
-                <div style={{ fontSize: "12px", marginTop: "2px" }}>
-                  Doc ID: <span className="hash-tag">{uploadSuccess.docId.slice(0, 16)}…</span>
+                <div style={{ fontSize: "12px", marginTop: "2px", display: "flex", flexDirection: "column", gap: "2px" }}>
+                  <span>Doc ID: <span className="hash-tag">{uploadSuccess.docId.slice(0, 16)}…</span></span>
+                  {uploadSuccess.ipfsCid && (
+                    <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <span>IPFS: <span className="hash-tag">{uploadSuccess.ipfsCid.slice(0, 16)}…</span></span>
+                      <a
+                        href={getIpfsGatewayUrl(uploadSuccess.ipfsCid)}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ color: "#2563eb", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "2px" }}
+                      >
+                        <ExternalLink size={11} />
+                        <span>View</span>
+                      </a>
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -388,30 +418,32 @@ export default function DashboardPage({ setPage }) {
               </p>
             </div>
           ) : (
-            <div className="activity-timeline">
-              {activities.map((item, index) => (
-                <div key={index} className="activity-item">
-                  <div className={`activity-dot ${item.dot}`} />
-                  <div className="activity-main">
-                    <span className="activity-title">{item.title}</span>
-                    <span className="activity-subtitle">{item.subtitle}</span>
+            <div className="activity-timeline-scroll">
+              <div className="activity-timeline">
+                {activities.map((item, index) => (
+                  <div key={index} className="activity-item">
+                    <div className={`activity-dot ${item.dot}`} />
+                    <div className="activity-main">
+                      <span className="activity-title">{item.title}</span>
+                      <span className="activity-subtitle">{item.subtitle}</span>
+                    </div>
+                    <div className="activity-meta">
+                      <span className="activity-date">{item.date}</span>
+                      {item.link && (
+                        <a
+                          href={item.link}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="activity-link"
+                        >
+                          View on Blockchain
+                          <ExternalLink size={11} />
+                        </a>
+                      )}
+                    </div>
                   </div>
-                  <div className="activity-meta">
-                    <span className="activity-date">{item.date}</span>
-                    {item.link && (
-                      <a
-                        href={item.link}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="activity-link"
-                      >
-                        View on Blockchain
-                        <ExternalLink size={11} />
-                      </a>
-                    )}
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           )}
         </div>

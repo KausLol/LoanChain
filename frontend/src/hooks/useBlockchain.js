@@ -117,7 +117,30 @@ export function useDocuments(contracts) {
     }
   }, [contracts]);
 
-  return { uploadDocument, verifyDocumentIntegrity, getMyDocuments, loading, txHash, error };
+  const getDocument = useCallback(async (docId) => {
+    try {
+      if (!contracts?.documentRegistry) return null;
+      const d = await contracts.documentRegistry.getDocument(docId);
+      return {
+        id: docId,
+        docHash: d.docHash,
+        owner: d.docOwner,
+        issuer: d.issuer,
+        docType: Number(d.docType),
+        status: Number(d.status),
+        ipfsCid: d.ipfsCid,
+        uploadedAt: Number(d.uploadedAt),
+        attestedAt: Number(d.attestedAt),
+        isRevoked: d.isRevoked,
+        merkleRoot: d.merkleRoot,
+      };
+    } catch (err) {
+      console.warn("Could not fetch document", docId, err);
+      return null;
+    }
+  }, [contracts]);
+
+  return { uploadDocument, verifyDocumentIntegrity, getMyDocuments, getDocument, loading, txHash, error };
 }
 
 /**

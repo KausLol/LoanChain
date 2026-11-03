@@ -611,12 +611,12 @@ export default function LoanApplicationPage({ setPage }) {
           </div>
 
           {selectedDocs.some(
-            (id) => !myDocs.find((d) => d.id === id)?.aiAttestation
+            (id) => !myDocs.find((d) => d.id === id)?.aiAttestation || myDocs.find((d) => d.id === id)?.aiAttestation?.verdict !== 0
           ) && (
             <div className="alert-box warning" style={{ marginBottom: "20px" }}>
               <AlertCircle size={18} style={{ flexShrink: 0, marginTop: "1px" }} />
               <div>
-                <strong>Advisory:</strong> One or more selected documents do not have on-chain AI verification attestations. You may still submit, but loan officers may request AI verification before marking documents verified.
+                <strong>Manual Verification Required:</strong> One or more selected documents do not have on-chain AI attestations. The loan officer will manually inspect your original files hosted on <strong>IPFS</strong> before verifying or approving your application.
               </div>
             </div>
           )}

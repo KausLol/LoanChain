@@ -7,7 +7,7 @@ This guide provides both a **plain-language overview** for loan applicants and b
 ## 1. Plain-Language Explanation (For Applicants & Loan Officers)
 
 ### What Does the AI Verification Service Do?
-When an applicant applies for a loan in LoanChain, they upload documents (such as salary slips, bank account statements, and employee ID cards).
+When an applicant applies for a loan in LoanChain, they upload documents (such as salary slips, bank account statements, Aadhaar cards, and PAN cards).
 - **In Phase 1**, the blockchain only proved that a document file had not been modified after upload (integrity of the registered `docHash`). However, if an applicant uploaded an *already-fabricated* or *edited* salary slip, Phase 1 had no way of knowing whether the numbers inside were legitimate or internally consistent.
 - **In Phase 2**, the **AI Verification Layer** inspects the **content** of the document:
   1. It reads the text, numbers, and tables from the document file.
@@ -16,12 +16,15 @@ When an applicant applies for a loan in LoanChain, they upload documents (such a
   4. It scans the PDF file for signs of digital tampering (such as editing software traces, retrofitted text layers, font inconsistencies, or white-out overlays covering old numbers).
   5. It reconciles documents across the bundle (e.g., confirming that the net salary on the payslip matches the salary credit deposit on the bank statement).
   6. It produces an **advisory verdict** (`Approved`, `Borderline`, or `Rejected`) and a **cryptographic signature** that can be permanently recorded on Ethereum Sepolia.
+- **In Phase 2.5 & IPFS Layer**:
+  1. **AI Affordability Engine**: Computes debt-to-income (DTI) and FOIR capacity, estimating safe monthly EMI ceilings and advisory counter-offers.
+  2. **Public Pinata IPFS for Manual Review**: If an applicant attaches documents that have not been AI-verified, the files are pinned to Public IPFS. Loan officers are flagged with `Manual Review Required` and can inspect the original dummy PDF/image via one-click **"View on IPFS"** links before making credit decisions.
 
 ### Why the AI Does Not Make the Final Lending Decision (Human-in-the-Loop)
 The AI is strictly an **evidence generator**, not a loan officer.
 - The AI cannot prove that a company in the real world actually exists unless attested by an accredited issuer (`IssuerRegistry.sol`).
 - The AI cannot account for special officer exemptions or manual bank waivers.
-- Therefore, the AI provides an explainable score, a list of passed/failed checks, and an **advisory suggested action**. The authorized loan officer remains the sole human decision-maker who approves, rejects, or counter-offers the loan.
+- Therefore, the AI provides an explainable score, a list of passed/failed checks, and an **advisory suggested action**. The authorized loan officer remains the sole human decision-maker who approves, rejects, or counter-offers the loan. For non-AI-verified documents, the officer uses the integrated IPFS viewer to review original files directly.
 
 ### Privacy & Consent Guarantees
 LoanChain is built on user privacy:
@@ -29,6 +32,7 @@ LoanChain is built on user privacy:
 2. **Local Pre-Verification**: Your browser calculates the `keccak256` hash of your selected file and checks it against the blockchain record. If the file is not the exact file registered on-chain, it is rejected locally without sending anything over the network.
 3. **Zero Persistent Storage**: Files are processed entirely in ephemeral memory and wiped immediately in a secure `finally` code block. Neither the original document nor the raw extracted text is ever written to disk or recorded in server logs.
 4. **PII Masking**: Only masked identifiers (e.g., PAN `ABCDE****F`, Account `XXXXXX7890`, Aadhaar `XXXX XXXX 1234`) are retained in audit reports. Full government identity numbers are never stored.
+5. **Decentralized IPFS Storage**: Off-chain files reside on IPFS addressed strictly by their cryptographic content identifier (CID); personal PII is never committed to the public Ethereum ledger.
 
 ### What is the On-Chain AI Attestation?
 Once verified, the AI service uses a private cryptographic key to generate an **EIP-712 digital signature** certifying the result (`verdict`, `confidence`, `templateRef`, `explanationHash`).
@@ -315,3 +319,29 @@ The repository ships with ready-to-test dummy documents located in the `dummy/` 
 | | Bank Statement | [`statement456.pdf`](file:///c:/Data/Programs/loanchain_new/dummy/statement456.pdf) | Priya Sharma, Opening: ₹24,000, Deposit: **₹47,000 (Salary)**, Closing: ₹53,000 |
 
 Both bundles are validated by automated unit and integration tests in [`test_verify_pipeline.py`](file:///c:/Data/Programs/loanchain_new/ai-service/tests/test_verify_pipeline.py) and [`test_bundle.py`](file:///c:/Data/Programs/loanchain_new/ai-service/tests/test_bundle.py).
+
+---
+
+## 6. IPFS Document Storage & Pinata Gateway for Manual Inspection
+
+### 6.1 Purpose & Role in the Underwriting Flow
+When an applicant submits documents that are not yet AI-verified, or whose templates are not supported by automated rules, LoanChain guarantees an unblocked credit evaluation path:
+1. **Automated Background IPFS Pinning**: When the borrower uploads a file (in `DocumentsPage.jsx` or `DashboardPage.jsx`), it is automatically pinned to Public Pinata IPFS. Only the resulting `ipfs://<CID>` is recorded on Sepolia in `DocumentRegistry.sol`.
+2. **Borrower Advisory Banner**: When submitting a loan application with unverified documents (`LoanApplicationPage.jsx`), the borrower is notified that their files will be reviewed manually via IPFS.
+3. **Officer Manual Review Mode**: When the officer opens the loan in `ApplicationsPage.jsx`:
+   - Non-AI-verified documents are flagged with an amber `Manual Review Required` badge.
+   - A prominent officer callout directs the underwriter to inspect the customer's original files.
+   - Every document provides a direct **"View on IPFS"** link opening the document via `https://gateway.pinata.cloud/ipfs/<CID>`.
+   - The officer visually checks the file, confirms consistency, and executes on-chain verification or approval.
+
+### 6.2 Setting Up Free Public Pinata IPFS
+
+1. Sign up for a free account at [Pinata Cloud](https://app.pinata.cloud/) (includes 1 GB free storage and public gateway access).
+2. Navigate to **API Keys** → **New Key**, select `Admin` or enable `pinFileToIPFS`, and generate a **JWT (Secret Access Token)**.
+3. Add the token to `frontend/.env`:
+   ```env
+   VITE_PINATA_JWT=your_pinata_jwt_here
+   VITE_PINATA_GATEWAY=https://gateway.pinata.cloud
+   ```
+4. Once saved, the upload panel in **My Documents** displays:
+   `Storage Engine: ● Public Pinata IPFS (Auto-Pinned)`.

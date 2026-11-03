@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     templates_dir: str = "templates"
     database_url: str = "sqlite:///data/reports.db"
 
+    # Pinata IPFS
+    pinata_jwt: str = ""
+    pinata_api_key: str = ""
+    pinata_api_secret: str = ""
+    pinata_gateway: str = "https://gateway.pinata.cloud"
+
     # Limits & security
     max_upload_size_mb: int = 10
     max_pages: int = 20

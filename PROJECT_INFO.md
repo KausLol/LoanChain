@@ -16,6 +16,7 @@
 8. [Deployment, Configuration & Usage Guide](#8-deployment-configuration--usage-guide)
 9. [AI Verification Layer: Phase 2 Architecture (Completed)](#9-ai-verification-layer-phase-2-architecture-completed)
 10. [AI-Assisted Loan Affordability & Repayment Capacity Engine](#10-ai-assisted-loan-affordability--repayment-capacity-engine)
+11. [IPFS Storage & Pinata Public Gateway Integration](#11-ipfs-storage--pinata-public-gateway-integration)
 
 ---
 
@@ -78,7 +79,8 @@ LoanChain establishes a **decentralized, tamper-evident trust anchor** on the Et
 | **Eth-Account / Eth-Hash**| `^0.13.0` | Cryptography & Signing | EIP-712 typed-data hashing and secp256k1 low-$s$ ECDSA signature generation. |
 | **Financial Math Engine** | Python / Standard Library | Underwriting Advisory | Reducing-balance EMI amortization, dynamic tenure expansion, present-value borrowing capacity, and FOIR DTI ratio modeling. |
 | **Lucide React** | `^1.62.0` | UI Design | Consistent, modern vector iconography replacing all emojis. |
-| **CSS3 Design System** | Custom Properties | Styling | Clean, human-crafted fintech UI (dark navy `#1e3a5f`, slate neutrals, 4px/6px radii, 3px badges, zero AI gradients/glows, mathematically centered timeline). |
+| **Pinata IPFS** | REST API v1 / Gateway | Storage Layer | Decentralized document file storage for unverified/manual review documents; public gateway (`gateway.pinata.cloud`) resolution. |
+| **CSS3 Design System** | Custom Properties | Styling | Clean, human-crafted fintech UI (dark navy `#1e3a5f`, slate neutrals, 4px/6px radii, 3px badges, zero AI gradients/glows, mathematically centered timeline, bounded scrollbars). |
 
 ---
 
@@ -188,7 +190,8 @@ loanchain_new/
         │   └── useAIVerification.js    # Hook coordinating off-chain AI analysis and on-chain EIP-712 anchoring
         │
         ├── services/
-        │   └── aiService.js            # Client HTTP service communicating with FastAPI endpoints
+        │   ├── aiService.js            # Client HTTP service communicating with FastAPI endpoints
+        │   └── pinataService.js        # Public Pinata IPFS pinning service and gateway resolution (gateway.pinata.cloud)
         │
         ├── components/
         │   ├── AIAffordabilityCard.jsx # Advisory card: verified income, obligations, safe EMI, DTI, counter-offers
@@ -347,25 +350,24 @@ loanchain_new/
 - **Dashboard** ([`DashboardPage.jsx`](file:///c:/Data/Programs/loanchain_new/frontend/src/pages/DashboardPage.jsx)):
   - Top "Welcome back" banner with wallet identity card.
   - 4 dynamic metric cards reading directly from connected on-chain state (strictly `0` for new accounts).
-  - Drag-and-drop document upload zone with client-side hashing and one-click Sepolia anchoring.
-  - Real-time Recent Activity timeline with exact mathematical dot-and-line vertical alignment (centered at 9px).
+  - Drag-and-drop document upload zone with client-side hashing, automated Public Pinata IPFS pinning, and one-click Sepolia anchoring.
+  - Real-time Recent Activity timeline with exact mathematical dot-and-line vertical alignment (centered at 9px), housed in a bounded scrollable container (`max-height: 310px`) with custom slim scrollbar preventing infinite vertical stretching.
   - Applications summary table with "View Details" modal.
 - **New Application** ([`LoanApplicationPage.jsx`](file:///c:/Data/Programs/loanchain_new/frontend/src/pages/LoanApplicationPage.jsx)):
   - Step 1: Loan parameters (Amount, Tenure, Purpose, Interest Rate) with live reducing-balance EMI calculation.
-  - Step 2: Document selector bundling previously registered on-chain hashes, featuring live **AI Affordability Analysis** preview evaluated directly against the borrower's selected salary slips and bank statements.
-  - Step 3: Review & blockchain submission with Sepolia transaction receipt link.
+  - Step 2: Document selector bundling previously registered on-chain hashes.
+  - Step 3: Review & Submit featuring live **AI Affordability Analysis** advisory card evaluated strictly against the borrower's selected documents, with clear advisories for non-AI-verified documents requiring manual officer inspection via IPFS.
 - **My Documents** ([`DocumentsPage.jsx`](file:///c:/Data/Programs/loanchain_new/frontend/src/pages/DocumentsPage.jsx)):
-  - Document hashing & registration dropzone supporting Aadhaar, PAN, Salary Slips, Bank Statements, Address Proof, and IT Returns.
-  - Registered documents bundle card list with one-click hash copying and full metadata inspection.
-  - Dynamic status badges replacing ambiguous static "Pending" labels:
-    - `Anchored on Chain` (Cryptographically verified and attested by AI on Sepolia)
-    - `Under Review` (Active in application underwriting)
-    - `AI Rejected` (Failed deterministic rules or forensic anomaly check)
-    - `Registered` (Uploaded and anchored, awaiting AI verification)
-  - Direct "AI Verify" trigger opening `AIVerificationPanel.jsx`.
+  - Document registration dropzone supporting Aadhaar, PAN, Salary Slips, Bank Statements, Address Proof, and IT Returns, with automated Public Pinata IPFS background pinning and explicit `Storage Engine: Public Pinata IPFS (Auto-Pinned)` indicator (no manual CID typing required).
+  - Registered documents list with quiet, non-wrapping monospace hash display (`0x473e4e7d…e3e6d60c`), subtle inline copy button with immediate `Copied!` tooltip, and inline `· IPFS ↗` gateway link.
+  - Unified single status badge (`AI Approved`, `AI Rejected`, `Under Review`, `Registered`, `Officer Verified`) eliminating redundant duplicate badge pairings and pill overload.
+  - Streamlined action group (`[AI Verify]` for unverified, `[Details]` with 1-click AI report access).
 - **Applications** ([`ApplicationsPage.jsx`](file:///c:/Data/Programs/loanchain_new/frontend/src/pages/ApplicationsPage.jsx)):
   - Complete list of submitted loan applications with status filters (`All`, `Under Review`, `Approved`, `Rejected`, `Disbursed`).
   - Officer execution modal featuring:
+    - On-chain document metadata resolution via `getDocument(docId)` to display document types (`Aadhaar Card`, `PAN Card`, `Salary Slip`, `Bank Statement`).
+    - Dedicated `Manual Review Required` badge and direct **"View on IPFS"** link button for non-AI-verified documents, allowing visual inspection of original files off-chain.
+    - Explicit officer advisory alert explaining manual inspection requirements before on-chain approval.
     - On-chain AI attestation bundle status (`bundleVerdict`) with Ethers v6 frozen array proxy resolution via `Array.from(ids)`.
     - Integrated **AI Affordability Card** ([`AIAffordabilityCard.jsx`](file:///c:/Data/Programs/loanchain_new/frontend/src/components/AIAffordabilityCard.jsx)) displaying verified monthly income, obligations, safe EMI ceiling, DTI, and suggested counter-offer terms.
     - Cross-Document Reconciliation trigger (`/v1/verify/bundle`) comparing employee name and company name across attached payslips, PAN, and Aadhaar documents.
@@ -439,6 +441,8 @@ VITE_CONSENT_MANAGER=0xYourConsentManagerAddress
 VITE_LOAN_APPLICATION=0xYourLoanApplicationAddress
 VITE_AI_ATTESTATION=0xYourAIAttestationAddress
 VITE_AI_SERVICE_URL=http://localhost:8000
+VITE_PINATA_JWT=your_pinata_jwt_here
+VITE_PINATA_GATEWAY=https://gateway.pinata.cloud
 ```
 
 ### 8.3 Starting the Development Server
@@ -456,11 +460,12 @@ Open `http://localhost:5173` in your browser. Ensure MetaMask is connected to **
 
 ### 8.4 Testing the End-to-End Workflow
 1. **Explore Landing Page & Connect Wallet**: Visit `http://localhost:5173`. Review the value proposition and feature architecture. Click "Launch Application" or "Connect Wallet" to authorize MetaMask on **Sepolia Testnet**. The interface automatically transitions to the borrower dashboard.
-2. **Register Identity & Financial Documents**: Navigate to **My Documents** or use the dashboard dropzone. Select documents from the `dummy/` directory (e.g. `aadhaar_test.pdf`, `pan_test.pdf`, `salary1234.pdf`, `statement123.pdf`). The files are cryptographically digested in memory (`keccak256`). Click "Register Document on Blockchain" and approve the transaction in MetaMask.
-3. **Run AI Verification & On-Chain Anchoring**: Click "AI Verify" on each registered document card. Review the privacy consent modal, inspect extracted masked fields (e.g. Aadhaar UID, PAN number, salary earnings, net pay) and deterministic rule checks. Click "Anchor AI Result on Sepolia" to record the EIP-712 cryptographic attestation on `AIAttestation.sol`. Notice the document badge updates dynamically to `Anchored on Chain`.
-4. **Submit Loan with Live Affordability Preview**: Go to **New Application**. Enter desired loan parameters (e.g. `0.5 ETH`, 24 months, 8.5% interest rate). In Step 2, select your verified documents. The integrated **AI Affordability Engine** automatically analyzes your net income, calculates existing obligations, computes your projected DTI, and displays the advisory repayment card. Review and click "Submit Loan Application".
+2. **Register Identity & Financial Documents**: Navigate to **My Documents** or use the dashboard dropzone. Select documents from the `dummy/` directory (e.g. `aadhaar_test.pdf`, `pan_test.pdf`, `salary1234.pdf`, `statement123.pdf`). The file is automatically pinned to Public Pinata IPFS in the background (or assigned a simulated CID if Pinata is unconfigured) and cryptographically digested in memory (`keccak256`). Click "Register Document on Blockchain" and approve the transaction in MetaMask.
+3. **Run AI Verification & On-Chain Anchoring**: Click "AI Verify" on each registered document card. Review the privacy consent modal, inspect extracted masked fields (e.g. Aadhaar UID, PAN number, salary earnings, net pay) and deterministic rule checks. Click "Anchor AI Result on Sepolia" to record the EIP-712 cryptographic attestation on `AIAttestation.sol`. Notice the unified badge updates dynamically to `AI Approved (98%)`.
+4. **Submit Loan with Live Affordability Preview**: Go to **New Application**. Enter desired loan parameters (e.g. `0.5 ETH`, 24 months, 8.5% interest rate). In Step 2, select your verified documents. In Step 3 (Review & Submit), the integrated **AI Affordability Engine** automatically analyzes your net income, calculates existing obligations, computes your projected DTI, and displays the advisory repayment card. If non-AI-verified documents are attached, an advisory confirms they will be manually inspected via IPFS. Review and click "Submit Loan Application".
 5. **Inspect Audit Log & Attestations**: Navigate to **Audit Log** to inspect state entries, then switch to the **AI Attestations** tab to view the immutable cryptographic records anchored on Sepolia.
-6. **Officer Review & Advisory Counter-Offer Evaluation**: If logged in with the contract owner or authorized officer wallet, open **Applications**, click "Details" on an application:
+6. **Officer Review, IPFS Document Inspection & Advisory Counter-Offers**: If logged in with the contract owner or authorized officer wallet, open **Applications**, click "Details" on an application:
+   - For non-AI-verified documents, review the amber `Manual Review Required` badge and click **"View on IPFS"** to visually verify the customer's original dummy document on `gateway.pinata.cloud`.
    - Inspect the on-chain AI attestation bundle status (`bundleVerdict`).
    - Run the Cross-Document Reconciliation check to verify that employee name and company name match across payslips, PAN, and Aadhaar cards.
    - Review the **AI Affordability Card**: check whether the applicant is within the 50% FOIR threshold or if an advisory counter-offer (adjusted amount or tenure) is recommended.
@@ -757,3 +762,96 @@ The affordability engine is visualized cleanly across the application via [`AIAf
    - When an officer opens application details, the affordability card is prominently displayed alongside the on-chain attestation bundle status.
    - If an application is overstretched ($\text{DTI} > 50\%$), the card displays the suggested counter-offer terms ($P_{\text{max}}$ or $n_{\text{adj}}$).
    - The officer can click "Accept Suggested Terms" to immediately populate the counter-offer transaction input fields in `LoanApplication.sol`.
+
+---
+
+## 11. IPFS Storage & Pinata Public Gateway Integration
+
+### 11.1 Problem & Motivation for Manual Review
+While LoanChain provides deterministic EIP-712 cryptographic AI verification for standardized documents (Salary Slips, Bank Statements, Aadhaar, PAN Cards), real-world lending requires handling non-standard, legacy, or self-uploaded documents where:
+1. An applicant uploads an unconventional format or issuer not covered by active AI templates.
+2. The AI attestation is missing, or the applicant proceeds with a document without running AI verification.
+3. The loan officer must perform a visual, manual review of the original file before deciding whether to verify the documents and approve the loan on Sepolia.
+
+Under GDPR/DPDP privacy constraints, the original document file must never be placed on the public Ethereum ledger. Instead, LoanChain pins the document file to **IPFS (InterPlanetary File System)** via **Pinata**, storing only the content identifier (`ipfsCid`) on-chain in `DocumentRegistry.sol`.
+
+---
+
+### 11.2 Dual-Tier Architecture & Pinata Service
+
+The Pinata integration is designed with a resilient dual-tier fallback architecture:
+
+```
+┌────────────────────────────────────────────────────────┐
+│                      Frontend UI                       │
+│  (DocumentsPage.jsx / DashboardPage.jsx / AppsPage)    │
+└───────────┬────────────────────────────────┬───────────┘
+            │ Direct Browser Upload          │ Backend Relay Upload
+            │ (if VITE_PINATA_JWT set)       │ (if PINATA_JWT in ai-service)
+            ▼                                ▼
+┌───────────────────────┐        ┌───────────────────────┐
+│   Pinata Cloud API    │        │   FastAPI AI Service  │
+│  pinFileToIPFS (v1)   │        │   POST /v1/ipfs/upload│
+└───────────┬───────────┘        └───────────┬───────────┘
+            │                                │
+            ▼                                ▼
+┌────────────────────────────────────────────────────────┐
+│                   Public Pinata IPFS                   │
+│   CID: bafy... or Qm...                                │
+│   Public Gateway: https://gateway.pinata.cloud/ipfs/   │
+└────────────────────────────────────────────────────────┘
+```
+
+#### Core Service Module: `frontend/src/services/pinataService.js`
+- `isPinataConfigured()`: Checks if frontend or backend Pinata credentials exist.
+- `cleanIpfsCid(cid)`: Strips `ipfs://`, `/ipfs/`, or white-space prefixes from CIDs.
+- `getIpfsGatewayUrl(cid)`: Generates the public gateway URL (`${PINATA_GATEWAY}/ipfs/${cleanCid}`).
+- `getGatewayOptions(cid)`: Provides fallback mirrors (`gateway.pinata.cloud`, `ipfs.io`, `dweb.link`, `cloudflare-ipfs.com`).
+- `uploadFileToPinata(file, metadata)`: Pins the file to Pinata with automatic fallback from frontend JWT to API key/secret to backend relay `POST /v1/ipfs/upload`.
+
+---
+
+### 11.3 End-to-End Workflow for Non-AI Verified Documents
+
+1. **Document Registration (`DocumentsPage.jsx` & `DashboardPage.jsx`)**:
+   - The user selects a document file and selects its classification.
+   - **Automated Background Pinning**: No manual CID text entry is required. The UI displays a clean `Storage Engine: ● Public Pinata IPFS (Auto-Pinned)` indicator.
+   - If Pinata is configured, the file is pinned to Pinata IPFS, returning a real CID (`ipfs://bafy...`).
+   - The client-side `keccak256` hash and CID are registered on Sepolia via `DocumentRegistry.uploadDocument(hash, salt, docType, ipfsCid, merkleRoot)`.
+   - In the document list, each document displays a quiet, non-wrapping monospace hash (`0x473e4e7d…e3e6d60c`), a subtle copy icon with `Copied!` tooltip, an inline `· IPFS ↗` link, and a unified status badge (`[✓ AI Approved (98%)]`, `[✕ AI Rejected (95%)]`, `[⚠ Under Review]`, `[Registered]`).
+   - If Pinata is unconfigured, simulated CIDs are used automatically for sandbox development without blocking transactions.
+
+2. **Loan Submission with Unverified Documents (`LoanApplicationPage.jsx`)**:
+   - The applicant selects their registered document(s) and proceeds to Review & Submit.
+   - If any attached document lacks an AI attestation, an advisory banner informs the borrower:
+     > *"Manual Verification Required: One or more selected documents do not have on-chain AI attestations. The loan officer will manually inspect your original files hosted on IPFS before verifying or approving your application."*
+
+3. **Officer Manual Review Portal (`ApplicationsPage.jsx`)**:
+   - The loan officer opens the loan details modal.
+   - For every attached document, the officer sees:
+     - Document type (`DOC_TYPE_LABELS`).
+     - Document hash on Sepolia.
+     - Attestation status: `AI Approved` badge, or `Manual Review Required` (amber tag).
+     - Direct **"View on IPFS"** link button (`ExternalLink` icon) pointing to the public Pinata gateway URL.
+   - If unverified documents exist, a prominent officer alert displays:
+     > *"Manual Officer Inspection Required: X of Y document(s) in this application do not have on-chain AI attestations. Use the View on IPFS button for each non-attested document above to review the customer's original file before verifying or approving this loan."*
+   - The officer clicks **View on IPFS** to inspect the PDF in a new tab, verifies that the details match, and clicks **Mark Docs Verified** / **Approve Loan** directly on Sepolia.
+
+---
+
+### 11.4 Configuration & Setup
+
+To enable live Public Pinata IPFS uploads:
+
+1. **Sign up at [Pinata Cloud](https://app.pinata.cloud/)** (Free Tier includes 1 GB storage and public gateway access).
+2. Go to **API Keys** → **New Key**, enable `pinFileToIPFS` permissions, and generate a **JWT (Secret Access Token)**.
+3. Add the token to `frontend/.env`:
+   ```bash
+   VITE_PINATA_JWT=your_pinata_jwt_here
+   VITE_PINATA_GATEWAY=https://gateway.pinata.cloud
+   ```
+4. (Optional) For backend server-side uploads, also add to `ai-service/.env`:
+   ```bash
+   PINATA_JWT=your_pinata_jwt_here
+   PINATA_GATEWAY=https://gateway.pinata.cloud
+   ```

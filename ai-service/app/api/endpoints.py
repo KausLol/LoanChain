@@ -327,3 +327,84 @@ async def analyze_loan_affordability(
         interest_rate_bps=interestRate,
     )
     return affordability
+
+
+@router.post("/ipfs/upload")
+async def upload_file_to_ipfs(
+    file: UploadFile = File(...),
+    docType: Optional[int] = Form(None),
+):
+    """
+    Pins a document file to Pinata IPFS using server-side credentials.
+    Returns the IPFS CID and public gateway URL.
+    """
+    jwt = settings.pinata_jwt.strip()
+    api_key = settings.pinata_api_key.strip()
+    api_secret = settings.pinata_api_secret.strip()
+
+    if not jwt and not (api_key and api_secret):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Pinata IPFS credentials not configured. Please set PINATA_JWT in .env.",
+        )
+
+    import json
+    import httpx
+
+    content = await file.read()
+    headers = {}
+    if jwt:
+        headers["Authorization"] = f"Bearer {jwt}"
+    else:
+        headers["pinata_api_key"] = api_key
+        headers["pinata_secret_api_key"] = api_secret
+
+    metadata = {
+        "name": file.filename or "loan-document.pdf",
+        "keyvalues": {
+            "app": "LoanChain",
+            "docType": str(docType) if docType is not None else "unknown",
+        },
+    }
+    options = {"cidVersion": 1}
+
+    files = {
+        "file": (file.filename or "document.pdf", content, file.content_type or "application/octet-stream"),
+    }
+    data = {
+        "pinataMetadata": json.dumps(metadata),
+        "pinataOptions": json.dumps(options),
+    }
+
+    async with httpx.AsyncClient(timeout=45.0) as client:
+        try:
+            resp = await client.post(
+                "https://api.pinata.cloud/pinning/pinFileToIPFS",
+                headers=headers,
+                files=files,
+                data=data,
+            )
+        except Exception as exc:
+            logger.error(f"Failed to connect to Pinata: {exc}")
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Failed to reach Pinata IPFS service: {exc}",
+            )
+
+        if resp.status_code != 200:
+            logger.error(f"Pinata returned error {resp.status_code}: {resp.text}")
+            raise HTTPException(
+                status_code=resp.status_code,
+                detail=f"Pinata IPFS error: {resp.text}",
+            )
+
+        res_data = resp.json()
+        cid = res_data.get("IpfsHash")
+        gateway = settings.pinata_gateway.rstrip("/")
+        return {
+            "cid": cid,
+            "ipfsUri": f"ipfs://{cid}",
+            "gatewayUrl": f"{gateway}/ipfs/{cid}",
+            "pinSize": res_data.get("PinSize"),
+            "timestamp": res_data.get("Timestamp"),
+        }

@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { useWeb3 } from "../context/Web3Context";
 import { useLoans } from "../hooks/useBlockchain";
-import { LOAN_STATUS_LABELS } from "../config/contracts";
+import { LOAN_STATUS_LABELS, DOC_TYPE_LABELS } from "../config/contracts";
 import AIBadge from "../components/AIBadge";
 import AIAffordabilityCard from "../components/AIAffordabilityCard";
 import { verifyDocumentBundle, analyzeAffordability } from "../services/aiService";
+import { getIpfsGatewayUrl } from "../services/pinataService";
 import {
   Plus,
   RefreshCw,
@@ -13,6 +14,8 @@ import {
   CheckCircle2,
   AlertTriangle,
   Shield,
+  ExternalLink,
+  FileText,
 } from "lucide-react";
 import { ethers } from "ethers";
 
@@ -61,6 +64,7 @@ export default function ApplicationsPage({ setPage }) {
   const [selectedLoan, setSelectedLoan] = useState(null);
   const [actionMsg, setActionMsg] = useState(null);
   const [loanDocIds, setLoanDocIds] = useState([]);
+  const [loanDocDetails, setLoanDocDetails] = useState({});
   const [bundleVerdict, setBundleVerdict] = useState(null); // { verdict, attestedCount }
   const [strictAIRequired, setStrictAIRequired] = useState(false);
   const [docAttestations, setDocAttestations] = useState({});
@@ -74,6 +78,7 @@ export default function ApplicationsPage({ setPage }) {
   useEffect(() => {
     if (!contracts || !selectedLoan) {
       setLoanDocIds([]);
+      setLoanDocDetails({});
       setBundleVerdict(null);
       setStrictAIRequired(false);
       setDocAttestations({});
@@ -91,6 +96,32 @@ export default function ApplicationsPage({ setPage }) {
         if (!active) return;
         const rawIds = Array.from(ids);
         setLoanDocIds(rawIds);
+
+        // Fetch on-chain document records (docType, ipfsCid, hash, status)
+        if (contracts.documentRegistry && rawIds.length > 0) {
+          const detailsMap = {};
+          await Promise.all(
+            rawIds.map(async (docId) => {
+              try {
+                const doc = await contracts.documentRegistry.getDocument(docId);
+                detailsMap[docId] = {
+                  id: docId,
+                  docHash: doc.docHash,
+                  owner: doc.docOwner,
+                  issuer: doc.issuer,
+                  docType: Number(doc.docType),
+                  status: Number(doc.status),
+                  ipfsCid: doc.ipfsCid,
+                  uploadedAt: Number(doc.uploadedAt),
+                  attestedAt: Number(doc.attestedAt),
+                };
+              } catch (e) {
+                console.warn("Could not fetch document registry record for", docId, e);
+              }
+            })
+          );
+          if (active) setLoanDocDetails(detailsMap);
+        }
 
         // Fetch AI affordability analysis for this loan application
         analyzeAffordability({
@@ -376,6 +407,9 @@ export default function ApplicationsPage({ setPage }) {
                     <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                       {loanDocIds.map((docId, idx) => {
                         const att = docAttestations[docId];
+                        const detail = loanDocDetails[docId];
+                        const isAiVerified = att && att.verdict === 0;
+
                         return (
                           <div
                             key={idx}
@@ -386,12 +420,63 @@ export default function ApplicationsPage({ setPage }) {
                               background: "#ffffff",
                               border: "1px solid var(--border-color)",
                               borderRadius: "6px",
-                              padding: "6px 10px",
+                              padding: "8px 12px",
                               fontSize: "12px",
+                              gap: "10px",
+                              flexWrap: "wrap",
                             }}
                           >
-                            <span className="hash-tag">{docId.slice(0, 10)}…{docId.slice(-8)}</span>
-                            <AIBadge verdict={att?.verdict} confidenceBps={att?.confidenceBps} size="sm" />
+                            <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: "160px" }}>
+                              <FileText size={16} color="#475569" style={{ flexShrink: 0 }} />
+                              <div>
+                                <div style={{ fontWeight: 600, color: "var(--text-main)", fontSize: "12.5px" }}>
+                                  {detail?.docType != null ? DOC_TYPE_LABELS[detail.docType] || "Document" : "Document"}
+                                </div>
+                                <div style={{ fontSize: "11px", color: "#64748b" }}>
+                                  <span className="hash-tag" style={{ fontSize: "11px" }}>{docId.slice(0, 10)}…{docId.slice(-8)}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                              {att ? (
+                                <AIBadge verdict={att.verdict} confidenceBps={att.confidenceBps} size="sm" />
+                              ) : (
+                                <span
+                                  className="status-badge"
+                                  style={{
+                                    background: "#fef3c7",
+                                    color: "#92400e",
+                                    border: "1px solid #fde68a",
+                                    fontSize: "11px",
+                                    padding: "2px 7px",
+                                  }}
+                                  title="Document was attached without an on-chain AI attestation"
+                                >
+                                  Manual Review Required
+                                </span>
+                              )}
+
+                              {detail?.ipfsCid && (
+                                <a
+                                  href={getIpfsGatewayUrl(detail.ipfsCid)}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="btn btn-outline btn-sm"
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: "4px",
+                                    fontSize: "11px",
+                                    padding: "3px 8px",
+                                  }}
+                                  title={`Inspect document via Public IPFS Gateway (${detail.ipfsCid})`}
+                                >
+                                  <ExternalLink size={11} />
+                                  <span>View on IPFS</span>
+                                </a>
+                              )}
+                            </div>
                           </div>
                         );
                       })}
@@ -456,7 +541,7 @@ export default function ApplicationsPage({ setPage }) {
                           >
                             <AlertTriangle size={16} color="#d97706" style={{ flexShrink: 0 }} />
                             <span>
-                              <strong>Under Review:</strong> AI attestation flagged warnings requiring manual officer review.
+                              <strong>Under Review:</strong> AI attestation flagged warnings requiring manual officer review. Inspect attached files via IPFS before proceeding.
                             </span>
                           </div>
                         )
@@ -464,8 +549,8 @@ export default function ApplicationsPage({ setPage }) {
                         <div
                           style={{
                             display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
+                            flexDirection: "column",
+                            gap: "6px",
                             background: "#fffbeb",
                             border: "1px solid #fef3c7",
                             borderRadius: "6px",
@@ -474,10 +559,15 @@ export default function ApplicationsPage({ setPage }) {
                             color: "#92400e",
                           }}
                         >
-                          <AlertTriangle size={16} color="#d97706" style={{ flexShrink: 0 }} />
-                          <span>
-                            <strong>Pending AI Verification:</strong> {loanDocIds.length - (bundleVerdict?.attestedCount || 0)} of {loanDocIds.length} document(s) in this application do not have an on-chain AI attestation.
-                          </span>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <AlertTriangle size={16} color="#d97706" style={{ flexShrink: 0 }} />
+                            <span>
+                              <strong>Manual Officer Inspection Required:</strong> {loanDocIds.length - (bundleVerdict?.attestedCount || 0)} of {loanDocIds.length} document(s) in this application do not have on-chain AI attestations.
+                            </span>
+                          </div>
+                          <div style={{ fontSize: "11.5px", color: "#78350f", marginLeft: "24px" }}>
+                            Use the <strong>View on IPFS</strong> button for each non-attested document above to review the customer's original file before verifying or approving this loan.
+                          </div>
                         </div>
                       )}
                     </div>

@@ -5,6 +5,11 @@ import { DOC_TYPE_LABELS, DOC_STATUS_LABELS } from "../config/contracts";
 import AIBadge from "../components/AIBadge";
 import AIVerificationPanel from "../components/AIVerificationPanel";
 import {
+  isPinataConfigured,
+  uploadFileToPinata,
+  getIpfsGatewayUrl,
+} from "../services/pinataService";
+import {
   Folder,
   FileText,
   Upload,
@@ -17,31 +22,73 @@ import {
   Check,
   ShieldCheck,
   Shield,
+  ExternalLink,
+  AlertTriangle,
 } from "lucide-react";
 
-function StatusBadge({ status, aiAttestation }) {
-  if (status === 4) {
+function UnifiedDocBadge({ doc, onClick }) {
+  if (!doc) return null;
+
+  if (doc.status === 4) {
     return <span className="status-badge badge-needsdocs">Revoked</span>;
   }
-  if (status === 3) {
+  if (doc.status === 3) {
     return <span className="status-badge badge-rejected">Rejected</span>;
   }
-  if (status === 1) {
-    return <span className="status-badge badge-verified">Issuer Attested</span>;
-  }
-  if (status === 2) {
+  if (doc.status === 2) {
     return <span className="status-badge badge-approved">Officer Verified</span>;
   }
-  if (aiAttestation) {
-    if (aiAttestation.verdict === 0) {
-      return <span className="status-badge badge-approved">Anchored on Chain</span>;
-    } else if (aiAttestation.verdict === 1) {
-      return <span className="status-badge badge-review">Under Review</span>;
-    } else if (aiAttestation.verdict === 2) {
-      return <span className="status-badge badge-rejected">AI Rejected</span>;
-    }
+  if (doc.status === 1) {
+    return <span className="status-badge badge-verified">Issuer Attested</span>;
   }
-  return <span className="status-badge badge-submitted">Registered</span>;
+
+  if (doc.aiAttestation) {
+    const { verdict, confidenceBps } = doc.aiAttestation;
+    const pct = confidenceBps ? `(${(confidenceBps / 100).toFixed(0)}%)` : "";
+    if (verdict === 0) {
+      return (
+        <span
+          className="status-badge badge-approved"
+          onClick={onClick}
+          style={{ cursor: onClick ? "pointer" : "default" }}
+          title={onClick ? "AI verified and anchored on Sepolia. Click to view verification report." : "AI verified on Sepolia"}
+        >
+          <CheckCircle2 size={12} />
+          <span>AI Approved {pct}</span>
+        </span>
+      );
+    }
+    if (verdict === 2) {
+      return (
+        <span
+          className="status-badge badge-rejected"
+          onClick={onClick}
+          style={{ cursor: onClick ? "pointer" : "default" }}
+          title={onClick ? "AI verification rejected. Click to view verification report." : "AI verification rejected"}
+        >
+          <XCircle size={12} />
+          <span>AI Rejected {pct}</span>
+        </span>
+      );
+    }
+    return (
+      <span
+        className="status-badge badge-review"
+        onClick={onClick}
+        style={{ cursor: onClick ? "pointer" : "default" }}
+        title={onClick ? "AI flagged warnings. Click to view verification report." : "AI flagged warnings"}
+      >
+        <AlertTriangle size={12} />
+        <span>Under Review {pct}</span>
+      </span>
+    );
+  }
+
+  return (
+    <span className="status-badge badge-submitted" title="Document registered on Sepolia. Ready for AI verification.">
+      Registered
+    </span>
+  );
 }
 
 function formatDate(ts) {
@@ -68,9 +115,9 @@ export default function DocumentsPage() {
   const [docs, setDocs] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [ipfsUploadStatus, setIpfsUploadStatus] = useState("");
   const [file, setFile] = useState(null);
   const [docType, setDocType] = useState(0);
-  const [ipfsCid, setIpfsCid] = useState("");
   const [success, setSuccess] = useState(null);
   const [uploadErr, setUploadErr] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
@@ -137,9 +184,6 @@ export default function DocumentsPage() {
       setFile(f);
       setSuccess(null);
       setUploadErr(null);
-      if (!ipfsCid) {
-        setIpfsCid(`ipfs://Qm${Math.random().toString(36).substring(2, 12)}`);
-      }
     }
   };
 
@@ -154,22 +198,40 @@ export default function DocumentsPage() {
     }
 
     setUploading(true);
+    setIpfsUploadStatus(isPinataConfigured() ? "Pinning file to Public Pinata IPFS…" : "Computing keccak256 hash…");
+
     try {
-      const cidToUse = ipfsCid.trim() || `ipfs://Qm${Math.random().toString(36).substring(2, 12)}`;
+      let cidToUse = `ipfs://Qm${Math.random().toString(36).substring(2, 15)}`;
+
+      if (isPinataConfigured()) {
+        try {
+          const pinRes = await uploadFileToPinata(file, {
+            docType: parseInt(docType),
+            fileName: file.name,
+          });
+          cidToUse = pinRes.ipfsUri;
+        } catch (pinErr) {
+          console.warn("Pinata upload failed:", pinErr);
+          throw new Error(`IPFS Upload Failed: ${pinErr.message}`);
+        }
+      }
+
+      setIpfsUploadStatus("Anchoring document hash on Sepolia…");
+
       const result = await uploadDocument({
         file,
         docType: parseInt(docType),
         ipfsCid: cidToUse,
         allDocHashes: docs.map((d) => d.docHash),
       });
-      setSuccess(result);
+      setSuccess({ ...result, ipfsCid: cidToUse });
       setFile(null);
-      setIpfsCid("");
       await refresh();
     } catch (err) {
       setUploadErr(err.reason || err.message);
     } finally {
       setUploading(false);
+      setIpfsUploadStatus("");
     }
   };
 
@@ -277,18 +339,28 @@ export default function DocumentsPage() {
               </select>
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Off-Chain Encrypted Storage (IPFS CID)</label>
-              <input
-                type="text"
-                className="form-control"
-                placeholder="ipfs://QmX..."
-                value={ipfsCid}
-                onChange={(e) => setIpfsCid(e.target.value)}
-              />
-              <span className="form-hint">
-                Only the CID is stored on-chain. No personal PII is written to the ledger.
-              </span>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "8px 12px",
+                background: "#f8fafc",
+                border: "1px solid var(--border-color)",
+                borderRadius: "6px",
+                marginBottom: "16px",
+                fontSize: "12px",
+              }}
+            >
+              <span style={{ color: "#64748b" }}>Storage Engine</span>
+              {isPinataConfigured() ? (
+                <span style={{ color: "#16a34a", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "5px" }}>
+                  <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#16a34a" }} />
+                  Public Pinata IPFS (Auto-Pinned)
+                </span>
+              ) : (
+                <span style={{ color: "#64748b" }}>Simulated IPFS Mode</span>
+              )}
             </div>
 
             {uploadErr && (
@@ -303,8 +375,22 @@ export default function DocumentsPage() {
                 <CheckCircle2 size={16} />
                 <div>
                   <div style={{ fontWeight: 600 }}>Registered On-Chain!</div>
-                  <div style={{ fontSize: "11.5px", fontFamily: "monospace" }}>
-                    Doc ID: {success.docId}
+                  <div style={{ fontSize: "11.5px", fontFamily: "monospace", display: "flex", flexDirection: "column", gap: "2px", marginTop: "2px" }}>
+                    <span>Doc ID: {success.docId}</span>
+                    {success.ipfsCid && (
+                      <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        IPFS: {success.ipfsCid.slice(0, 20)}…
+                        <a
+                          href={getIpfsGatewayUrl(success.ipfsCid)}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ color: "#2563eb", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "2px" }}
+                        >
+                          <ExternalLink size={11} />
+                          <span>View on IPFS</span>
+                        </a>
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -317,7 +403,7 @@ export default function DocumentsPage() {
               style={{ width: "100%", padding: "9px" }}
             >
               <ShieldCheck size={16} />
-              <span>{uploading ? "Anchoring Hash On-Chain…" : "Register Document on Blockchain"}</span>
+              <span>{uploading ? (ipfsUploadStatus || "Anchoring Hash On-Chain…") : "Register Document on Blockchain"}</span>
             </button>
           </form>
 
@@ -367,14 +453,16 @@ export default function DocumentsPage() {
                     style={{
                       border: "1px solid var(--border-color)",
                       borderRadius: "8px",
-                      padding: "14px 16px",
+                      padding: "12px 16px",
                       background: "#ffffff",
                       display: "flex",
                       justifyContent: "space-between",
                       alignItems: "center",
+                      gap: "12px",
                     }}
                   >
-                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    {/* Left: Document Type & Clean Metadata */}
+                    <div style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0 }}>
                       <div
                         style={{
                           width: "36px",
@@ -386,48 +474,113 @@ export default function DocumentsPage() {
                           alignItems: "center",
                           justifyContent: "center",
                           color: "#2563eb",
+                          flexShrink: 0,
                         }}
                       >
                         <FileText size={18} />
                       </div>
-                      <div>
+                      <div style={{ minWidth: 0 }}>
                         <div style={{ fontWeight: 600, fontSize: "14px", color: "var(--text-main)" }}>
                           {DOC_TYPE_LABELS[doc.docType] || "Document"}
                         </div>
-                        <div style={{ fontSize: "12px", color: "#6b7280", display: "flex", alignItems: "center", gap: "6px" }}>
-                          <span>Hash:</span>
+                        <div
+                          style={{
+                            fontSize: "12px",
+                            color: "#64748b",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            marginTop: "2px",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
                           <span
-                            className="hash-tag"
-                            onClick={() => handleCopy(doc.docHash, doc.id)}
-                            title="Click to copy full keccak256 hash"
+                            style={{
+                              fontFamily: "ui-monospace, SFMono-Regular, monospace",
+                              fontSize: "11.5px",
+                              color: "#475569",
+                            }}
+                            title={`Full hash: ${doc.docHash}`}
                           >
-                            {copiedId === doc.id ? <Check size={11} color="#16a34a" /> : <Copy size={11} />}
                             {shortHash(doc.docHash)}
                           </span>
+                          <button
+                            type="button"
+                            onClick={() => handleCopy(doc.docHash, doc.id)}
+                            title="Copy full keccak256 hash"
+                            style={{
+                              background: "none",
+                              border: "none",
+                              padding: "2px",
+                              cursor: "pointer",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              color: copiedId === doc.id ? "#16a34a" : "#94a3b8",
+                              lineHeight: 1,
+                            }}
+                          >
+                            {copiedId === doc.id ? <Check size={12} /> : <Copy size={12} />}
+                          </button>
+                          {copiedId === doc.id && (
+                            <span style={{ fontSize: "11px", color: "#16a34a", fontWeight: 600 }}>Copied!</span>
+                          )}
+
+                          {doc.ipfsCid && (
+                            <>
+                              <span style={{ color: "#cbd5e1" }}>·</span>
+                              <a
+                                href={getIpfsGatewayUrl(doc.ipfsCid)}
+                                target="_blank"
+                                rel="noreferrer"
+                                style={{
+                                  color: "#2563eb",
+                                  textDecoration: "none",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "3px",
+                                  fontSize: "11.5px",
+                                  fontWeight: 500,
+                                }}
+                                title={`View original file on IPFS: ${doc.ipfsCid}`}
+                              >
+                                <span>IPFS</span>
+                                <ExternalLink size={11} />
+                              </a>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
 
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                      <AIBadge
-                        verdict={doc.aiAttestation?.verdict}
-                        confidenceBps={doc.aiAttestation?.confidenceBps}
-                        size="sm"
+                    {/* Right: Single Status Badge & Essential Actions */}
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+                      <UnifiedDocBadge
+                        doc={doc}
+                        onClick={doc.aiAttestation ? () => setAiVerifyingDoc(doc) : undefined}
                       />
-                      <StatusBadge status={doc.status} aiAttestation={doc.aiAttestation} />
-                      <button
-                        className="btn btn-outline btn-sm"
-                        onClick={() => setAiVerifyingDoc(doc)}
-                        title="Run AI Verification on this document"
-                        style={{ display: "inline-flex", alignItems: "center", gap: "5px" }}
-                      >
-                        <Shield size={12} color="#2563eb" />
-                        <span>AI Verify</span>
-                      </button>
+
+                      {!doc.aiAttestation && (
+                        <button
+                          className="btn btn-outline btn-sm"
+                          onClick={() => setAiVerifyingDoc(doc)}
+                          title="Run AI content verification on this document"
+                          style={{
+                            borderColor: "#2563eb",
+                            color: "#2563eb",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "5px",
+                          }}
+                        >
+                          <Shield size={12} />
+                          <span>AI Verify</span>
+                        </button>
+                      )}
+
                       <button
                         className="btn btn-outline btn-sm"
                         onClick={() => setSelectedDoc(doc)}
-                        title="View Details"
+                        title="View document record details"
                       >
                         <Eye size={13} />
                         <span>Details</span>
@@ -457,7 +610,7 @@ export default function DocumentsPage() {
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--border-color)" }}>
                   <span style={{ color: "#6b7280" }}>Status</span>
-                  <StatusBadge status={selectedDoc.status} aiAttestation={selectedDoc.aiAttestation} />
+                  <UnifiedDocBadge doc={selectedDoc} />
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: "4px", padding: "8px 0", borderBottom: "1px solid var(--border-color)" }}>
                   <span style={{ color: "#6b7280", fontSize: "12px" }}>keccak256 Hash</span>
@@ -467,9 +620,24 @@ export default function DocumentsPage() {
                   <span style={{ color: "#6b7280", fontSize: "12px" }}>Merkle Bundle Root</span>
                   <span className="hash-tag" style={{ wordBreak: "break-all" }}>{selectedDoc.merkleRoot}</span>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--border-color)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid var(--border-color)" }}>
                   <span style={{ color: "#6b7280" }}>IPFS Storage Location</span>
-                  <span style={{ fontFamily: "monospace", fontSize: "12px" }}>{selectedDoc.ipfsCid}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span style={{ fontFamily: "monospace", fontSize: "12px" }}>{selectedDoc.ipfsCid || "—"}</span>
+                    {selectedDoc.ipfsCid && (
+                      <a
+                        href={getIpfsGatewayUrl(selectedDoc.ipfsCid)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="btn btn-outline btn-sm"
+                        style={{ padding: "2px 8px", fontSize: "11px", display: "inline-flex", alignItems: "center", gap: "4px" }}
+                        title="Open in Public IPFS Gateway"
+                      >
+                        <ExternalLink size={11} />
+                        <span>Open</span>
+                      </a>
+                    )}
+                  </div>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--border-color)" }}>
                   <span style={{ color: "#6b7280" }}>Attested By</span>
@@ -486,7 +654,19 @@ export default function DocumentsPage() {
                 )}
               </div>
             </div>
-            <div className="modal-card-footer">
+            <div className="modal-card-footer" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <button
+                className="btn btn-outline btn-sm"
+                onClick={() => {
+                  const d = selectedDoc;
+                  setSelectedDoc(null);
+                  setAiVerifyingDoc(d);
+                }}
+                style={{ borderColor: "#2563eb", color: "#2563eb", display: "inline-flex", alignItems: "center", gap: "5px" }}
+              >
+                <Shield size={13} />
+                <span>{selectedDoc.aiAttestation ? "View AI Verification Report" : "Run AI Verification"}</span>
+              </button>
               <button className="btn btn-outline" onClick={() => setSelectedDoc(null)}>Close</button>
             </div>
           </div>
