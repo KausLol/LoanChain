@@ -73,6 +73,7 @@ export default function ApplicationsPage({ setPage }) {
   const [bundleLoading, setBundleLoading] = useState(false);
   const [bundleErr, setBundleErr] = useState(null);
   const [loanAffordability, setLoanAffordability] = useState(null);
+  const [loanAffordabilityError, setLoanAffordabilityError] = useState(null);
 
   // Load document and AI attestation bundle details when selectedLoan changes
   useEffect(() => {
@@ -86,6 +87,7 @@ export default function ApplicationsPage({ setPage }) {
       setBundleFiles([]);
       setBundleErr(null);
       setLoanAffordability(null);
+      setLoanAffordabilityError(null);
       return;
     }
 
@@ -131,10 +133,17 @@ export default function ApplicationsPage({ setPage }) {
           interestRate: parseInt(selectedLoan.interestRate) || 850,
         })
           .then((aff) => {
-            if (active) setLoanAffordability(aff);
+            if (active) {
+              setLoanAffordability(aff);
+              setLoanAffordabilityError(null);
+            }
           })
           .catch((e) => {
             console.warn("Affordability query error:", e);
+            if (active) {
+              setLoanAffordability(null);
+              setLoanAffordabilityError(e.message || "Affordability analysis is unavailable.");
+            }
           });
 
         // Check strict policy
@@ -182,6 +191,12 @@ export default function ApplicationsPage({ setPage }) {
         }
       } catch (err) {
         console.warn("Failed to load loan documents:", err);
+        if (active) {
+          setLoanAffordability(null);
+          setLoanAffordabilityError(
+            err.message || "Could not load the loan documents for affordability analysis."
+          );
+        }
       }
     })();
 
@@ -576,6 +591,22 @@ export default function ApplicationsPage({ setPage }) {
 
                 {/* AI Loan Affordability Analysis Card */}
                 <AIAffordabilityCard affordability={bundleResult?.affordability || loanAffordability} />
+                {loanAffordabilityError && !bundleResult?.affordability && (
+                  <div
+                    style={{
+                      marginTop: "12px",
+                      padding: "10px 12px",
+                      borderRadius: "6px",
+                      background: "#fff7ed",
+                      border: "1px solid #fed7aa",
+                      color: "#9a3412",
+                      fontSize: "12px",
+                    }}
+                  >
+                    <strong>Affordability analysis unavailable:</strong>{" "}
+                    {loanAffordabilityError}
+                  </div>
+                )}
 
                 {/* Officer Cross-Document Consistency Audit (Only for multi-document applications) */}
                 {(isOwner || isOfficer) && loanDocIds.length > 1 && (

@@ -1,7 +1,10 @@
+import logging
 from typing import Dict, Any, Optional
 from eth_hash.auto import keccak
 from web3 import Web3
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 # ABI snippet for DocumentRegistry
 DOC_REGISTRY_ABI = [
@@ -71,9 +74,13 @@ class ChainClient:
         """
         registry_addr = settings.document_registry_address
         if not registry_addr or registry_addr == "0x0000000000000000000000000000000000000000":
+            logger.error("DocumentRegistry address is not configured")
             return None
 
         try:
+            if not isinstance(doc_id, str) or len(doc_id.removeprefix("0x")) != 64:
+                logger.error("Invalid document ID length: %r", doc_id)
+                return None
             checksum_addr = Web3.to_checksum_address(registry_addr)
             contract = self.w3.eth.contract(address=checksum_addr, abi=DOC_REGISTRY_ABI)
             # Ensure doc_id is 32-byte hex
@@ -81,6 +88,7 @@ class ChainClient:
             res = contract.functions.getDocument(doc_id_bytes).call()
             doc_hash = "0x" + res[0].hex()
             if doc_hash == "0x" + "00" * 32:
+                logger.warning("Document ID %s is not registered in DocumentRegistry %s", doc_id, registry_addr)
                 return None
 
             return {
@@ -96,6 +104,12 @@ class ChainClient:
                 "merkleRoot": "0x" + res[9].hex(),
             }
         except Exception:
+            logger.exception(
+                "Failed to read document %s from DocumentRegistry %s using RPC %s",
+                doc_id,
+                registry_addr,
+                self.rpc_url,
+            )
             return None
 
     def is_active_issuer(self, issuer_address: str) -> bool:

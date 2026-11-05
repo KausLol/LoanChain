@@ -1,5 +1,8 @@
 import logging
+from io import BytesIO
 from typing import List, Optional
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, status
 from app.config import settings
 from app.core.intake import validate_file_bytes, IntakeValidationError
@@ -22,6 +25,52 @@ from app.store.report_store import report_store
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _clean_ipfs_cid(cid: str) -> str:
+    return (
+        str(cid)
+        .strip()
+        .replace("ipfs://", "", 1)
+        .replace("/ipfs/", "", 1)
+        .strip("/")
+    )
+
+
+def _fetch_ipfs_document(cid: str) -> bytes:
+    """Fetch a public IPFS document, tolerating gateway-specific pin restrictions."""
+    clean_cid = _clean_ipfs_cid(cid)
+    if not clean_cid:
+        raise ValueError("Document has no IPFS CID")
+
+    gateways = [
+        settings.pinata_gateway.rstrip("/"),
+        "https://gateway.pinata.cloud",
+        "https://ipfs.io",
+        "https://dweb.link",
+        "https://cloudflare-ipfs.com",
+    ]
+    max_bytes = settings.max_upload_size_mb * 1024 * 1024
+    errors = []
+
+    for gateway in dict.fromkeys(gateways):
+        url = f"{gateway}/ipfs/{clean_cid}"
+        try:
+            request = Request(url, headers={"User-Agent": "LoanChain-AI/1.0"})
+            with urlopen(request, timeout=20) as response:
+                content_length = response.headers.get("Content-Length")
+                if content_length and int(content_length) > max_bytes:
+                    raise ValueError(f"document exceeds {settings.max_upload_size_mb} MB limit")
+                data = response.read(max_bytes + 1)
+                if len(data) > max_bytes:
+                    raise ValueError(f"document exceeds {settings.max_upload_size_mb} MB limit")
+                return data
+        except (HTTPError, URLError, TimeoutError, ValueError, OSError) as exc:
+            errors.append(f"{url}: {exc}")
+
+    raise ValueError(
+        f"Could not retrieve CID {clean_cid} from IPFS gateways: " + "; ".join(errors)
+    )
 
 
 @router.get("/health")
@@ -315,8 +364,45 @@ async def analyze_loan_affordability(
                     rep_dict = reps[0].get("report_data", {})
                     if rep_dict:
                         doc_results.append(VerificationResult(**rep_dict))
+                        continue
                 except Exception as ex:
                     logger.warning(f"Could not reconstruct VerificationResult for {did}: {ex}")
+
+            # Reports are local to the AI service that performed verification.
+            # Rebuild missing reports from the on-chain CID so officers on another
+            # PC do not silently receive demo fallback values.
+            try:
+                doc_info = chain_client.get_document_info(did)
+                if not doc_info or not doc_info.get("ipfsCid"):
+                    raise ValueError("document metadata or IPFS CID is unavailable on-chain")
+                file_bytes = _fetch_ipfs_document(doc_info["ipfsCid"])
+                recovered = await verify_document(
+                    file=UploadFile(
+                        file=BytesIO(file_bytes),
+                        filename=f"{did}.pdf",
+                    ),
+                    docId=did,
+                    docType=int(doc_info["docType"]),
+                    skip_chain_check=False,
+                )
+                doc_results.append(recovered)
+            except Exception as ex:
+                logger.warning(f"Could not recover document report for {did}: {ex}")
+
+        if ids and len(doc_results) != len(ids):
+            raise HTTPException(
+                status_code=status.HTTP_424_FAILED_DEPENDENCY,
+                detail={
+                    "error": {
+                        "code": "DOCUMENT_REPORT_UNAVAILABLE",
+                        "message": (
+                            "One or more document reports are unavailable on this AI service "
+                            "and the registered IPFS files could not be retrieved. Affordability "
+                            "was not calculated from fallback values."
+                        ),
+                    },
+                },
+            )
 
     affordability = evaluate_affordability(
         doc_results=doc_results if doc_results else None,

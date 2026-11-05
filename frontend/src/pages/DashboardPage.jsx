@@ -74,6 +74,7 @@ export default function DashboardPage({ setPage }) {
 
   const [myLoans, setMyLoans] = useState([]);
   const [myDocs, setMyDocs] = useState([]);
+  const [aiVerifiedDocsCount, setAiVerifiedDocsCount] = useState(0);
   const [recentLogs, setRecentLogs] = useState([]);
   const [uploadFile, setUploadFile] = useState(null);
   const [uploadDocType, setUploadDocType] = useState(0);
@@ -87,6 +88,7 @@ export default function DashboardPage({ setPage }) {
     if (!contracts || !account) {
       setMyLoans([]);
       setMyDocs([]);
+      setAiVerifiedDocsCount(0);
       setRecentLogs([]);
       return;
     }
@@ -97,6 +99,24 @@ export default function DashboardPage({ setPage }) {
       ]);
       setMyLoans(loans || []);
       setMyDocs(docs || []);
+
+      // DocumentRegistry status is independent from AI attestation status.
+      // Count only documents with an actual on-chain AI attestation.
+      if (contracts.aiAttestation && docs?.length) {
+        const aiVerificationResults = await Promise.all(
+          docs.map(async (doc) => {
+            try {
+              return await contracts.aiAttestation.hasAttestation(doc.id);
+            } catch (err) {
+              console.warn("Could not check AI attestation for dashboard document", doc.id, err);
+              return false;
+            }
+          })
+        );
+        setAiVerifiedDocsCount(aiVerificationResults.filter(Boolean).length);
+      } else {
+        setAiVerifiedDocsCount(0);
+      }
 
       // Fetch actual document audit logs from the contract
       try {
@@ -172,8 +192,8 @@ export default function DashboardPage({ setPage }) {
     }
   };
 
-  // Real metric counts without hardcoding
-  const verifiedDocsCount = myDocs.filter((d) => d.status === 1 || d.status === 2).length;
+  // AI verification is recorded by AIAttestation, not DocumentRegistry status.
+  const verifiedDocsCount = aiVerifiedDocsCount;
   const activeLoansCount = myLoans.filter((l) => [0, 1, 2, 8].includes(l.status)).length;
   const approvedLoansCount = myLoans.filter((l) => l.status === 3 || l.status === 6).length;
   const pendingActionsCount = myLoans.filter((l) => l.status === 8).length;
@@ -220,7 +240,7 @@ export default function DashboardPage({ setPage }) {
           </div>
           <div>
             <div className="metric-value">{verifiedDocsCount}</div>
-            <div className="metric-label">Verified Documents</div>
+            <div className="metric-label">AI-Verified Documents</div>
           </div>
         </div>
 
